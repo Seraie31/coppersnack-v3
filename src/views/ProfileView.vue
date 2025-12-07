@@ -254,11 +254,7 @@ const rechargeBalance = async () => {
     await loadUserProfile()
     await loadTransactions()
     
-    if (authStore.user) {
-      authStore.user.balance = (authStore.user.balance || 0) + rechargeAmount.value
-    }
-
-    alert(`✅ Rechargement de ${rechargeAmount.value} € effectué !`)
+      alert(`✅ Rechargement de ${rechargeAmount.value} € effectué !`)
     rechargeAmount.value = 5
   } catch (error) {
     console.error('Erreur rechargement:', error)
