@@ -255,7 +255,7 @@ const rechargeBalance = async () => {
     await loadTransactions()
     
       alert(`✅ Rechargement de ${rechargeAmount.value} € effectué !`)
-    rechargeAmount.value = 5
+    rechargeAmount.value = null
   } catch (error) {
     console.error('Erreur rechargement:', error)
     alert('❌ Erreur lors du rechargement')
