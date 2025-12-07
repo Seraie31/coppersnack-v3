@@ -7,17 +7,27 @@ import { useAuth } from "@/contexts/AuthContext";
 export const QuickActions = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: balance = 0 } = useBalance(user);
+  const { data: balance } = useBalance(user);
+
+  // Normaliser le solde (nombre)
+  const rawBalance =
+    typeof balance === "number"
+      ? balance
+      : balance && typeof balance === "object"
+      ? (balance as any).amount ?? 0
+      : 0;
+
+  const displayBalance = Number(rawBalance) || 0;
 
   return (
     <div className="flex flex-col sm:flex-row gap-2 mb-4">
       <Button
         variant="default"
-        onClick={() => navigate('/profile')}
+        onClick={() => navigate("/profile")}
         className="w-full sm:w-auto gap-2"
       >
         <Wallet className="h-4 w-4" />
-        <span>Portefeuille: {balance.toFixed(2)}€</span>
+        <span>Portefeuille: {displayBalance.toFixed(2)}€</span>
       </Button>
     </div>
   );

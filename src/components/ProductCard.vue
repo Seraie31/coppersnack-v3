@@ -208,11 +208,7 @@ await updateDoc(productRef, {
     // 🗑️ Nettoyer les anciennes transactions
     await cleanOldTransactions()
 
-    // Mise à jour locale
-    if (authStore.user) {
-      authStore.user.balance = (authStore.user.balance || 0) - props.product.price
-    }
-
+  
     alert(`✅ ${props.product.name} consommé(e) avec succès !`)
     emit('consumed')
   } catch (error) {
