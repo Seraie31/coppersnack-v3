@@ -15,9 +15,18 @@ import { useQueryClient } from "@tanstack/react-query";
 const Profile = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { data: balance = 0 } = useBalance(user);
-  const [userProfile, setUserProfile] = useState<{ username: string | null } | null>(null);
-  const queryClient = useQueryClient();
+  const { data: balance } = useBalance(user);
+const queryClient = useQueryClient();
+
+// Normaliser le solde
+const rawBalance =
+  typeof balance === "number"
+    ? balance
+    : balance && typeof balance === "object"
+    ? (balance as any).amount ?? 0
+    : 0;
+
+const displayBalance = Number(rawBalance) || 0;
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -76,11 +85,11 @@ const Profile = () => {
 
       // Mettre à jour le solde
       const { error: balanceError } = await supabase
-        .from('balances')
+        .from("balances")
         .update({
-          amount: balance + amount
-        })
-        .eq('user_id', user.id);
+       amount: displayBalance + amount,
+  })
+  .eq("user_id", user.id);
 
       if (balanceError) throw balanceError;
 
