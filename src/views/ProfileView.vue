@@ -139,7 +139,7 @@ import Navbar from '@/components/Navbar.vue'
 const authStore = useAuthStore()
 const userProfile = ref(null)
 const transactions = ref([])
-const rechargeAmount = ref(5)
+const rechargeAmount = ref(null)
 const loading = ref(false)
 const loadingTransactions = ref(false)
 
