@@ -125,7 +125,7 @@
                 {{ transaction.type === 'consumption' ? '-' : '+' }}{{ transaction.amount.toFixed(2) }} €
               </div>
 
-              <!-- Bouton Annuler : seulement pour conso du jour non annulée -->
+              <!-- Bouton Annuler -->
               <button
                 v-if="transaction.type === 'consumption' && isToday(transaction.date) && !transaction.canceled"
                 @click.stop="handleCancelTransaction(transaction)"
@@ -211,7 +211,7 @@ const handleCancelTransaction = async (transaction) => {
     // 1. Re-créditer le solde utilisateur
     const userRef = doc(db, 'users', transaction.userId)
     await updateDoc(userRef, {
-      balance: increment(transaction.amount) // amount est positif (1 €) pour une conso
+      balance: increment(transaction.amount)
     })
 
     // 2. Ré-incrémenter le stock du produit
@@ -226,6 +226,13 @@ const handleCancelTransaction = async (transaction) => {
       canceled: true,
       canceledAt: new Date()
     })
+
+    // ✅ Mise à jour immédiate pour l’UI
+    const t = transactions.value.find(t => t.id === transaction.id)
+    if (t) {
+      t.canceled = true
+      t.canceledAt = new Date()
+    }
 
     alert('✅ Consommation annulée avec succès')
   } catch (error) {
@@ -267,7 +274,7 @@ const loadTransactions = async () => {
   }
 }
 
-// 🗑️ Fonction pour nettoyer les anciennes transactions
+// 🗑️ Suppression auto des anciennes transactions
 const cleanOldTransactions = async () => {
   try {
     const q = query(
@@ -282,13 +289,9 @@ const cleanOldTransactions = async () => {
     if (allTransactions.length > 10) {
       const transactionsToDelete = allTransactions.slice(10)
       
-      console.log(`🗑️ Suppression de ${transactionsToDelete.length} anciennes transactions...`)
-      
       for (const transactionDoc of transactionsToDelete) {
         await deleteDoc(doc(db, 'transactions', transactionDoc.id))
       }
-      
-      console.log('✅ Anciennes transactions supprimées')
     }
   } catch (error) {
     console.error('Erreur nettoyage transactions:', error)
@@ -316,13 +319,12 @@ const rechargeBalance = async () => {
       date: new Date()
     })
 
-    // 🗑️ Nettoyer les anciennes transactions
     await cleanOldTransactions()
 
     await loadUserProfile()
     await loadTransactions()
     
-      alert(`✅ Rechargement de ${rechargeAmount.value} € effectué !`)
+    alert(`✅ Rechargement de ${rechargeAmount.value} € effectué !`)
     rechargeAmount.value = null
   } catch (error) {
     console.error('Erreur rechargement:', error)
