@@ -94,18 +94,18 @@
 
         <div v-else class="space-y-2 sm:space-y-3">
           <div 
-            v-for="transaction in transactions" 
+            v-for="transaction in transactions"
             :key="transaction.id"
             class="flex items-center justify-between p-3 sm:p-4 bg-dark-200 rounded-lg hover:bg-dark-300 transition-colors"
           >
             <div class="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-              <div 
+              <div
                 class="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-xl sm:text-2xl flex-shrink-0"
                 :class="transaction.type === 'consumption' ? 'bg-red-900/30' : 'bg-green-900/30'"
               >
                 {{ transaction.type === 'consumption' ? '🛒' : '💰' }}
               </div>
-              
+
               <div class="min-w-0 flex-1">
                 <p class="font-semibold text-sm sm:text-base truncate">
                   {{ transaction.type === 'consumption' ? transaction.productName : 'Rechargement' }}
@@ -116,11 +116,31 @@
               </div>
             </div>
 
-            <div 
-              class="text-base sm:text-xl font-bold flex-shrink-0 ml-2"
-              :class="transaction.type === 'consumption' ? 'text-red-400' : 'text-green-400'"
-            >
-              {{ transaction.type === 'consumption' ? '-' : '+' }}{{ transaction.amount.toFixed(2) }} €
+            <!-- Montant + actions -->
+            <div class="flex items-center gap-3 flex-shrink-0 ml-2">
+              <div
+                class="text-base sm:text-xl font-bold"
+                :class="transaction.type === 'consumption' ? 'text-red-400' : 'text-green-400'"
+              >
+                {{ transaction.type === 'consumption' ? '-' : '+' }}{{ transaction.amount.toFixed(2) }} €
+              </div>
+
+              <!-- Bouton Annuler : seulement pour conso du jour non annulée -->
+              <button
+                v-if="transaction.type === 'consumption' && isToday(transaction.date) && !transaction.canceled"
+                @click.stop="handleCancelTransaction(transaction)"
+                class="text-xs sm:text-sm px-2 py-1 rounded bg-red-900/40 hover:bg-red-700 text-red-200"
+              >
+                Annuler
+              </button>
+
+              <!-- Étiquette si déjà annulée -->
+              <span
+                v-else-if="transaction.canceled"
+                class="text-xs text-gray-400 italic"
+              >
+                Annulée
+              </span>
             </div>
           </div>
         </div>
@@ -164,6 +184,54 @@ const formatDate = (date) => {
     hour: '2-digit',
     minute: '2-digit'
   }).format(d)
+}
+
+const isToday = (firestoreDate) => {
+  const d = firestoreDate?.toDate ? firestoreDate.toDate() : new Date(firestoreDate)
+  const now = new Date()
+  return (
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate()
+  )
+}
+
+const handleCancelTransaction = async (transaction) => {
+  if (!isToday(transaction.date)) {
+    alert('Vous ne pouvez annuler que les consommations du jour.')
+    return
+  }
+
+  const ok = confirm(
+    `Annuler la consommation de "${transaction.productName}" du ${formatDate(transaction.date)} ?`
+  )
+  if (!ok) return
+
+  try {
+    // 1. Re-créditer le solde utilisateur
+    const userRef = doc(db, 'users', transaction.userId)
+    await updateDoc(userRef, {
+      balance: increment(transaction.amount) // amount est positif (1 €) pour une conso
+    })
+
+    // 2. Ré-incrémenter le stock du produit
+    const productRef = doc(db, 'products', transaction.productId)
+    await updateDoc(productRef, {
+      stockFrigo: increment(1)
+    })
+
+    // 3. Marquer la transaction comme annulée
+    const transactionRef = doc(db, 'transactions', transaction.id)
+    await updateDoc(transactionRef, {
+      canceled: true,
+      canceledAt: new Date()
+    })
+
+    alert('✅ Consommation annulée avec succès')
+  } catch (error) {
+    console.error('Erreur annulation transaction :', error)
+    alert('❌ Erreur lors de l’annulation. Veuillez réessayer.')
+  }
 }
 
 const loadUserProfile = async () => {

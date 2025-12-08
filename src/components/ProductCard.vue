@@ -13,8 +13,10 @@
     </button>
 
     <!-- Overlay rupture de stock -->
-    <div v-if="isOutOfStock" 
-         class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded-xl z-10">
+    <div
+      v-if="isOutOfStock"
+      class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded-xl z-10"
+    >
       <span class="text-2xl font-bold text-red-500">Rupture de stock</span>
     </div>
 
@@ -42,9 +44,9 @@
       </span>
       <span 
         class="text-sm font-bold px-2 py-1 rounded"
-  :class="getStockClass(product.stockFrigo || 0)"
->
-  Stock: {{ product.stockFrigo || 0 }}
+        :class="getStockClass(product.stockFrigo || 0)"
+      >
+        Stock: {{ product.stockFrigo || 0 }}
       </span>
     </div>
 
@@ -63,7 +65,9 @@
 import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { db } from '@/firebase/config'
-import { doc, updateDoc, addDoc, collection, increment, arrayUnion, arrayRemove, deleteDoc, query, where, orderBy, getDocs } from 'firebase/firestore'
+import { doc, updateDoc, addDoc, collection, increment, arrayUnion, arrayRemove, deleteDoc, query, where, orderBy, getDocs 
+
+} from 'firebase/firestore'
 
 const props = defineProps({
   product: {
@@ -81,7 +85,9 @@ const emit = defineEmits(['consumed', 'favorite-changed'])
 const authStore = useAuthStore()
 const loading = ref(false)
 
-const isOutOfStock = computed(() => !props.product?.stockFrigo || props.product.stockFrigo === 0)
+const isOutOfStock = computed(
+  () => !props.product?.stockFrigo || props.product.stockFrigo === 0
+)
 const isFavorite = computed(() => props.favorites.includes(props.product.id))
 
 const formatCurrency = (amount) => {
@@ -116,12 +122,10 @@ const toggleFavorite = async () => {
     const userRef = doc(db, 'users', authStore.user.uid)
     
     if (isFavorite.value) {
-      // Retirer des favoris
       await updateDoc(userRef, {
         favorites: arrayRemove(props.product.id)
       })
     } else {
-      // Ajouter aux favoris
       await updateDoc(userRef, {
         favorites: arrayUnion(props.product.id)
       })
@@ -133,7 +137,8 @@ const toggleFavorite = async () => {
     alert('❌ Erreur lors de la mise à jour des favoris')
   }
 }
-// Fonction pour nettoyer les anciennes transactions
+
+// Nettoyer les anciennes transactions (garder les 10 dernières)
 const cleanOldTransactions = async () => {
   try {
     const q = query(
@@ -141,13 +146,13 @@ const cleanOldTransactions = async () => {
       where('userId', '==', authStore.user.uid),
       orderBy('date', 'desc')
     )
-    
+
     const snapshot = await getDocs(q)
     const allTransactions = snapshot.docs
-    
+
     if (allTransactions.length > 10) {
       const transactionsToDelete = allTransactions.slice(10)
-      
+
       for (const transactionDoc of transactionsToDelete) {
         await deleteDoc(doc(db, 'transactions', transactionDoc.id))
       }
@@ -156,19 +161,26 @@ const cleanOldTransactions = async () => {
     console.error('Erreur nettoyage transactions:', error)
   }
 }
-const handleConsume = async () => {
-  if (!props.product.stockFrigo || props.product.stockFrigo === 0) {
-  alert('❌ Produit en rupture de stock')
-  return
-}
 
+// Consommation avec confirmation
+const handleConsume = async () => {
+  // Vérif stock
+  if (!props.product.stockFrigo || props.product.stockFrigo === 0) {
+    alert('❌ Produit en rupture de stock')
+    return
+  }
+
+  // Vérif connexion
   if (!authStore.user) {
     alert('Vous devez être connecté')
     return
   }
 
-  if (!props.product.stockFrigo || props.product.stockFrigo === 0) {
-    alert('❌ Produit en rupture de stock')
+  // Confirmation
+  const ok = confirm(
+    `Vous êtes sur le point de consommer "${props.product.name}". Continuer ?`
+  )
+  if (!ok) {
     return
   }
 
@@ -183,11 +195,11 @@ const handleConsume = async () => {
 
     // Déduire du stock produit
     const productRef = doc(db, 'products', props.product.id)
-await updateDoc(productRef, {
-  stockFrigo: increment(-1)  // ← Modifier ici
-})
+    await updateDoc(productRef, {
+      stockFrigo: increment(-1)
+    })
 
-    // 💰 Ajouter l'argent à la Caisse Frigo
+    // Ajouter l'argent à la caisse frigo
     const frigoRef = doc(db, 'cashRegisters', 'frigo')
     await updateDoc(frigoRef, {
       balance: increment(props.product.price),
@@ -205,10 +217,8 @@ await updateDoc(productRef, {
       date: new Date()
     })
 
-    // 🗑️ Nettoyer les anciennes transactions
     await cleanOldTransactions()
 
-  
     alert(`✅ ${props.product.name} consommé(e) avec succès !`)
     emit('consumed')
   } catch (error) {
@@ -221,7 +231,6 @@ await updateDoc(productRef, {
 </script>
 
 <style scoped>
-/* Optimisation Mobile */
 @media (max-width: 640px) {
   .card {
     padding: 0.75rem;
@@ -241,7 +250,6 @@ await updateDoc(productRef, {
     padding: 0.5rem;
   }
 
-  /* Badge favori plus petit */
   .absolute.top-3.right-3 {
     top: 0.5rem;
     right: 0.5rem;
@@ -254,7 +262,6 @@ await updateDoc(productRef, {
     height: 1rem;
   }
 
-  /* Stock plus compact */
   .flex.items-center.justify-between.mb-4 {
     margin-bottom: 0.5rem;
   }
@@ -267,7 +274,6 @@ await updateDoc(productRef, {
     font-size: 1.25rem;
   }
 
-  /* Overlay rupture plus lisible */
   .absolute.inset-0 span {
     font-size: 1rem;
     padding: 0.5rem;
