@@ -93,58 +93,63 @@
         </div>
 
         <div v-else class="space-y-2 sm:space-y-3">
-          <div 
-            v-for="transaction in transactions"
-            :key="transaction.id"
-            class="flex items-center justify-between p-3 sm:p-4 bg-dark-200 rounded-lg hover:bg-dark-300 transition-colors"
-          >
-            <div class="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
-              <div
-                class="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-xl sm:text-2xl flex-shrink-0"
-                :class="transaction.type === 'consumption' ? 'bg-red-900/30' : 'bg-green-900/30'"
-              >
-                {{ transaction.type === 'consumption' ? '🛒' : '💰' }}
+          <transition-group name="hist" tag="div">
+            <div
+              v-for="transaction in transactions"
+              :key="transaction.id"
+              class="flex items-center justify-between p-3 sm:p-4 bg-dark-200 rounded-lg hover:bg-dark-300 transition-colors"
+              :class="[
+                transaction.canceled ? 'opacity-60 line-through' : '',
+                transaction._anim ? 'hist-flash' : ''
+              ]"
+            >
+              <div class="flex items-center gap-3 sm:gap-4 flex-1 min-w-0">
+                <div
+                  class="w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center text-xl sm:text-2xl flex-shrink-0"
+                  :class="transaction.type === 'consumption' ? 'bg-red-900/30' : 'bg-green-900/30'"
+                >
+                  {{ transaction.type === 'consumption' ? '🛒' : '💰' }}
+                </div>
+
+                <div class="min-w-0 flex-1">
+                  <p class="font-semibold text-sm sm:text-base truncate">
+                    {{ transaction.type === 'consumption' ? transaction.productName : 'Rechargement' }}
+                  </p>
+                  <p class="text-xs sm:text-sm text-gray-400">
+                    {{ formatDate(transaction.date) }}
+                  </p>
+                </div>
               </div>
 
-              <div class="min-w-0 flex-1">
-                <p class="font-semibold text-sm sm:text-base truncate">
-                  {{ transaction.type === 'consumption' ? transaction.productName : 'Rechargement' }}
-                </p>
-                <p class="text-xs sm:text-sm text-gray-400">
-                  {{ formatDate(transaction.date) }}
-                </p>
+              <!-- Montant + Annulation -->
+              <div class="flex items-center gap-3 flex-shrink-0 ml-2">
+                <div
+                  class="text-base sm:text-xl font-bold"
+                  :class="transaction.type === 'consumption' ? 'text-red-400' : 'text-green-400'"
+                >
+                  {{ transaction.type === 'consumption' ? '-' : '+' }}{{ transaction.amount.toFixed(2) }} €
+                </div>
+
+                <button
+                  v-if="transaction.type === 'consumption' && isToday(transaction.date) && !transaction.canceled"
+                  @click.stop="handleCancelTransaction(transaction)"
+                  class="text-xs sm:text-sm px-2 py-1 rounded bg-red-900/40 hover:bg-red-700 text-red-200"
+                >
+                  Annuler
+                </button>
+
+                <span
+                  v-else-if="transaction.canceled"
+                  class="text-xs text-gray-400 italic"
+                >
+                  Annulée
+                </span>
               </div>
             </div>
-
-            <!-- Montant + actions -->
-            <div class="flex items-center gap-3 flex-shrink-0 ml-2">
-              <div
-                class="text-base sm:text-xl font-bold"
-                :class="transaction.type === 'consumption' ? 'text-red-400' : 'text-green-400'"
-              >
-                {{ transaction.type === 'consumption' ? '-' : '+' }}{{ transaction.amount.toFixed(2) }} €
-              </div>
-
-              <!-- Bouton Annuler -->
-              <button
-                v-if="transaction.type === 'consumption' && isToday(transaction.date) && !transaction.canceled"
-                @click.stop="handleCancelTransaction(transaction)"
-                class="text-xs sm:text-sm px-2 py-1 rounded bg-red-900/40 hover:bg-red-700 text-red-200"
-              >
-                Annuler
-              </button>
-
-              <!-- Étiquette si déjà annulée -->
-              <span
-                v-else-if="transaction.canceled"
-                class="text-xs text-gray-400 italic"
-              >
-                Annulée
-              </span>
-            </div>
-          </div>
+          </transition-group>
         </div>
       </div>
+
     </div>
   </div>
 </template>
@@ -232,6 +237,15 @@ const handleCancelTransaction = async (transaction) => {
     if (t) {
       t.canceled = true
       t.canceledAt = new Date()
+      t._anim = true
+      setTimeout(() => {
+        t._anim = false
+      }, 400)
+    }
+
+    // ✅ Mettre à jour le solde affiché
+    if (userProfile.value) {
+      userProfile.value.balance += transaction.amount
     }
 
     alert('✅ Consommation annulée avec succès')
@@ -339,3 +353,27 @@ onMounted(async () => {
   await loadTransactions()
 })
 </script>
+
+<style scoped>
+.hist-enter-from,
+.hist-leave-to {
+  opacity: 0;
+  transform: translateY(-4px);
+}
+.hist-enter-active,
+.hist-leave-active {
+  transition: all 0.15s ease-out;
+}
+
+@keyframes histFlash {
+  0% {
+    box-shadow: 0 0 0 0 rgba(248, 113, 113, 0.8);
+  }
+  100% {
+    box-shadow: 0 0 0 14px rgba(248, 113, 113, 0);
+  }
+}
+.hist-flash {
+  animation: histFlash 0.4s ease-out;
+}
+</style>

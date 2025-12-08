@@ -52,12 +52,20 @@
 
     <!-- Bouton consommer -->
     <button 
-      @click="handleConsume" 
+      @click="showConfirm = true" 
       :disabled="isOutOfStock || loading"
       class="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all"
     >
       {{ loading ? 'Traitement...' : 'Consommer' }}
     </button>
+
+    <ConfirmModal
+      :show="showConfirm"
+      :title="`Confirmer la consommation`"
+      :message="'Vous êtes sur le point de consommer ' + product.name + ' pour ' + formatCurrency(product.price)"
+      @cancel="showConfirm = false"
+      @confirm="() => { showConfirm = false; handleConsume(); }"
+    />
   </div>
 </template>
 
@@ -65,9 +73,25 @@
 import { ref, computed } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { db } from '@/firebase/config'
-import { doc, updateDoc, addDoc, collection, increment, arrayUnion, arrayRemove, deleteDoc, query, where, orderBy, getDocs 
 
+import { 
+  doc,
+  updateDoc,
+  addDoc,
+  collection,
+  increment,
+  arrayUnion,
+  arrayRemove,
+  deleteDoc,
+  query,
+  where,
+  orderBy,
+  getDocs
 } from 'firebase/firestore'
+
+import ConfirmModal from '@/components/ConfirmModal.vue'
+
+const showConfirm = ref(false)
 
 const props = defineProps({
   product: {
@@ -138,7 +162,7 @@ const toggleFavorite = async () => {
   }
 }
 
-// Nettoyer les anciennes transactions (garder les 10 dernières)
+// Nettoyer les anciennes transactions
 const cleanOldTransactions = async () => {
   try {
     const q = query(
@@ -164,19 +188,16 @@ const cleanOldTransactions = async () => {
 
 // Consommation avec confirmation
 const handleConsume = async () => {
-  // Vérif stock
   if (!props.product.stockFrigo || props.product.stockFrigo === 0) {
     alert('❌ Produit en rupture de stock')
     return
   }
 
-  // Vérif connexion
   if (!authStore.user) {
     alert('Vous devez être connecté')
     return
   }
 
-  // Confirmation
   const ok = confirm(
     `Vous êtes sur le point de consommer "${props.product.name}". Continuer ?`
   )
@@ -187,26 +208,22 @@ const handleConsume = async () => {
   try {
     loading.value = true
 
-    // Déduire du solde utilisateur
     const userRef = doc(db, 'users', authStore.user.uid)
     await updateDoc(userRef, {
       balance: increment(-props.product.price)
     })
 
-    // Déduire du stock produit
     const productRef = doc(db, 'products', props.product.id)
     await updateDoc(productRef, {
       stockFrigo: increment(-1)
     })
 
-    // Ajouter l'argent à la caisse frigo
     const frigoRef = doc(db, 'cashRegisters', 'frigo')
     await updateDoc(frigoRef, {
       balance: increment(props.product.price),
       lastUpdate: new Date()
     })
 
-    // Enregistrer la transaction
     await addDoc(collection(db, 'transactions'), {
       userId: authStore.user.uid,
       userName: authStore.user.displayName || authStore.user.email,
