@@ -284,7 +284,7 @@
                       </td>
 
                       <!-- Stock Frigo -->
-                      <<td class="py-3 px-4 text-center">
+                      <td class="py-3 px-4 text-center">
                   <div class="flex items-center justify-center gap-2">
                   <button 
                   @click="updateStockFrigo(product.id, -1)"
@@ -468,48 +468,62 @@
   </div>
 </div>
     <!-- Modal Édition -->
-    <div 
-      v-if="showEditModal" 
-      class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
-      @click.self="closeEditModal"
-    >
-      <div class="card max-w-md w-full">
-        <h2 class="text-2xl font-bold mb-6">Modifier le produit</h2>
+<div 
+  v-if="showEditModal" 
+  class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+  @click.self="closeEditModal"
+>
+  <div class="card max-w-md w-full">
+    <h2 class="text-2xl font-bold mb-6">Modifier le produit</h2>
 
-        <div class="space-y-4">
-          <div>
-            <label class="block text-sm font-medium mb-2">Nom</label>
-            <input v-model="editForm.name" type="text" class="input-field">
-          </div>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium mb-2">Nom</label>
+        <input v-model="editForm.name" type="text" class="input-field">
+      </div>
 
-          <div>
-            <label class="block text-sm font-medium mb-2">Prix (€)</label>
-            <input v-model.number="editForm.price" type="number" step="0.01" class="input-field">
-          </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">Prix (€)</label>
+        <input v-model.number="editForm.price" type="number" step="0.01" class="input-field">
+      </div>
 
-          <div>
-            <label class="block text-sm font-medium mb-2">Catégorie</label>
-            <select v-model="editForm.category" class="input-field">
-              <option value="boissons">🥤 Boissons</option>
-              <option value="snacks">🍫 Snacks</option>
-            </select>
-          </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">Catégorie</label>
+        <select v-model="editForm.category" class="input-field">
+          <option value="boissons">🥤 Boissons</option>
+          <option value="snacks">🍫 Snacks</option>
+        </select>
+      </div>
 
-          <div>
-            <label class="block text-sm font-medium mb-2">Stock</label>
-            <input v-model.number="editForm.stock" type="number" class="input-field">
-          </div>
+      <!-- Nouveau bloc Stock Réserve et Stock Frigo -->
+      <div>
+        <label class="block text-sm font-medium mb-2">Stock Réserve</label>
+        <input
+          v-model.number="editForm.stockReserve"
+          type="number"
+          class="input-field"
+        >
+      </div>
 
-          <div>
-            <label class="block text-sm font-medium mb-2">URL Image</label>
-            <input v-model="editForm.image" type="text" class="input-field">
-          </div>
+      <div>
+        <label class="block text-sm font-medium mb-2">Stock Frigo</label>
+        <input
+          v-model.number="editForm.stockFrigo"
+          type="number"
+          class="input-field"
+        >
+      </div>
 
-          <div class="flex gap-3 mt-6">
-            <button @click="closeEditModal" class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">
-              Annuler
-            </button>
-            <button @click="saveProduct" class="flex-1 btn-primary">
+      <div>
+        <label class="block text-sm font-medium mb-2">URL Image</label>
+        <input v-model="editForm.image" type="text" class="input-field">
+      </div>
+
+      <div class="flex gap-3 mt-6">
+        <button @click="closeEditModal" class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg">
+          Annuler
+        </button>
+        <button @click="saveProduct" class="flex-1 btn-primary">
               Enregistrer
             </button>
           </div>
