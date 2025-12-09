@@ -284,26 +284,36 @@
                       </td>
 
                       <!-- Stock Frigo -->
-                      <td class="py-3 px-4 text-center">
-                        <div class="flex items-center justify-center gap-2">
-                          <button 
-                            @click="updateStockFrigo(product.id, -1)"
-                            class="px-2 py-1 bg-red-600 hover:bg-red-700 rounded text-sm"
+                      <<td class="py-3 px-4 text-center">
+                  <div class="flex items-center justify-center gap-2">
+                  <button 
+                  @click="updateStockFrigo(product.id, -1)"
+                  class="px-2 py-1 bg-red-600 hover:bg-red-700 rounded text-sm"
+                  >
+                    -1
+                  </button>
+                  <span 
+                    class="px-3 py-1 rounded font-bold"
+                    :class="getStockClass(product.stockFrigo || 0)"
+                    >
+                  {{ product.stockFrigo || 0 }}
+                    </span>
+                  <button 
+                  @click="updateStockFrigo(product.id, 1)"
+                  class="px-2 py-1 bg-green-600 hover:bg-green-700 rounded text-sm"
+                    >
+                    +1
+                  </button>
+
+                  <!-- nouveau bouton admin d'ajustement -->
+                  <button
+                  v-if="authStore.user?.role === 'admin'"
+                  @click="openAdjustFridge(product)"
+                  class="px-2 py-1 bg-dark-400 hover:bg-dark-300 rounded text-xs"
+                  title="Ajuster le stock frigo"
                           >
-                            -1
-                          </button>
-                          <span 
-                            class="px-3 py-1 rounded font-bold"
-                            :class="getStockClass(product.stockFrigo || 0)"
-                          >
-                            {{ product.stockFrigo || 0 }}
-                          </span>
-                          <button 
-                            @click="updateStockFrigo(product.id, 1)"
-                            class="px-2 py-1 bg-green-600 hover:bg-green-700 rounded text-sm"
-                          >
-                            +1
-                          </button>
+                        ⚙️
+                        </button>
                         </div>
                       </td>
 
@@ -416,6 +426,47 @@
       </div>
     </div>
 
+    <!-- Modal Ajustement Frigo -->
+<div
+  v-if="showAdjustFridge && fridgeProduct"
+  class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4"
+  @click.self="showAdjustFridge = false"
+>
+  <div class="card max-w-md w-full">
+    <h2 class="text-2xl font-bold mb-4">
+      Ajuster le stock frigo – {{ fridgeProduct.name }}
+    </h2>
+
+    <p class="text-xs text-gray-400 mb-4">
+      Stock frigo actuel : {{ fridgeProduct.stockFrigo || 0 }}
+    </p>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium mb-1">Nouveau stock frigo</label>
+      <input
+        v-model.number="newFridgeValue"
+        type="number"
+        min="0"
+        class="input-field"
+      />
+    </div>
+
+    <div class="flex justify-end gap-3">
+      <button
+        class="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg"
+        @click="showAdjustFridge = false"
+      >
+        Annuler
+      </button>
+      <button
+        class="px-4 py-2 btn-primary"
+        @click="applyAdjustFridge"
+      >
+        Valider
+      </button>
+    </div>
+  </div>
+</div>
     <!-- Modal Édition -->
     <div 
       v-if="showEditModal" 
@@ -729,6 +780,39 @@ const applyReassort = async () => {
   } catch (e) {
     console.error('Erreur réassort :', e)
     alert('❌ Erreur lors du réassort')
+  }
+}
+
+    const showAdjustFridge = ref(false)
+const fridgeProduct = ref(null)
+const newFridgeValue = ref(0)
+
+const openAdjustFridge = (product) => {
+  fridgeProduct.value = product
+  newFridgeValue.value = product.stockFrigo || 0
+  showAdjustFridge.value = true
+}
+
+const applyAdjustFridge = async () => {
+  if (!fridgeProduct.value) return
+
+  const value = Number(newFridgeValue.value) || 0
+  if (value < 0) {
+    alert('Le stock frigo ne peut pas être négatif.')
+    return
+  }
+
+  try {
+    const refDoc = doc(db, 'products', fridgeProduct.value.id)
+    await updateDoc(refDoc, { stockFrigo: value })
+
+    fridgeProduct.value.stockFrigo = value
+
+    showAdjustFridge.value = false
+    alert('✅ Stock frigo ajusté')
+  } catch (e) {
+    console.error('Erreur ajustement frigo :', e)
+    alert('❌ Erreur lors de l’ajustement du frigo')
   }
 }
 </script>
