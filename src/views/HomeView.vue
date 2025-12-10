@@ -61,7 +61,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useProductsStore } from '@/stores/products'
 import { useAuthStore } from '@/stores/auth'
 import { doc, getDoc } from 'firebase/firestore'
@@ -109,11 +109,16 @@ const loadUserFavorites = async () => {
 }
 
 const handleConsumed = () => {
-  productsStore.fetchProducts()
+  // Plus besoin de refetch, le onSnapshot mettra à jour tout seul
+  // productsStore.fetchProducts()
 }
 
 onMounted(async () => {
-  await productsStore.fetchProducts()
+  productsStore.listenProducts()
   await loadUserFavorites()
+})
+
+onUnmounted(() => {
+  productsStore.stopListening()
 })
 </script>
