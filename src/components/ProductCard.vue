@@ -67,8 +67,27 @@
       :title="`Confirmer la consommation`"
       :message="'Vous êtes sur le point de consommer ' + product.name + ' pour ' + formatCurrency(product.price)"
       @cancel="showConfirm = false"
-      @confirm="() => { showConfirm = false; handleConsume(); }"
+      @confirm="handleConfirm"
     />
+
+    <!-- MESSAGE DE SUCCÈS (remplace alert) -->
+    <div v-if="showSuccess" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+      <div class="bg-dark-100 rounded-xl p-6 max-w-sm mx-4 text-center">
+        <div class="text-5xl mb-4">✅</div>
+        <p class="text-lg font-bold mb-2">{{ product.name }}</p>
+        <p class="text-gray-400">consommé(e) avec succès !</p>
+      </div>
+    </div>
+
+    <!-- MESSAGE D'ERREUR (remplace alert) -->
+    <div v-if="showError" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+      <div class="bg-dark-100 rounded-xl p-6 max-w-sm mx-4 text-center">
+        <div class="text-5xl mb-4">❌</div>
+        <p class="text-lg font-bold mb-2">Erreur</p>
+        <p class="text-gray-400">{{ errorMessage }}</p>
+        <button @click="showError = false" class="mt-4 btn-primary">OK</button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -90,7 +109,7 @@ import {
   where,
   orderBy,
   getDocs,
-  Timestamp                   // ⬅️ AJOUT IMPORTANT
+  Timestamp
 } from 'firebase/firestore'
 
 import ConfirmModal from '@/components/ConfirmModal.vue'
@@ -98,6 +117,9 @@ import ConfirmModal from '@/components/ConfirmModal.vue'
 /* --------------------- STATE --------------------- */
 
 const showConfirm = ref(false)
+const showSuccess = ref(false)
+const showError = ref(false)
+const errorMessage = ref('')
 const loading = ref(false)
 
 const props = defineProps({
@@ -132,7 +154,11 @@ const handleImageError = (event) => {
 /* --------------------- FAVORIS --------------------- */
 
 const toggleFavorite = async () => {
-  if (!authStore.user) return alert('Vous devez être connecté')
+  if (!authStore.user) {
+    errorMessage.value = 'Vous devez être connecté'
+    showError.value = true
+    return
+  }
 
   try {
     const userRef = doc(db, 'users', authStore.user.uid)
@@ -146,7 +172,8 @@ const toggleFavorite = async () => {
     emit('favorite-changed')
   } catch (error) {
     console.error('Erreur favoris:', error)
-    alert('❌ Erreur lors de la mise à jour des favoris')
+    errorMessage.value = 'Erreur lors de la mise à jour des favoris'
+    showError.value = true
   }
 }
 
@@ -179,11 +206,26 @@ const cleanOldTransactions = async () => {
   }
 }
 
-/* --------------------- CONSOMMATION --------------------- */
+/* --------------------- CONFIRMATION + CONSOMMATION --------------------- */
+
+const handleConfirm = () => {
+  showConfirm.value = false
+  handleConsume()
+}
 
 const handleConsume = async () => {
-  if (props.product.stockFrigo === 0) return alert('❌ Produit en rupture de stock')
-  if (!authStore.user) return alert('Vous devez être connecté')
+  // Vérifications (SANS alert)
+  if (props.product.stockFrigo === 0) {
+    errorMessage.value = 'Produit en rupture de stock'
+    showError.value = true
+    return
+  }
+  
+  if (!authStore.user) {
+    errorMessage.value = 'Vous devez être connecté'
+    showError.value = true
+    return
+  }
 
   try {
     loading.value = true
@@ -222,12 +264,18 @@ const handleConsume = async () => {
     // Nettoyage (non bloquant)
     cleanOldTransactions().catch(() => {})
 
-    alert(`✅ ${props.product.name} consommé(e) avec succès !`)
+    // SUCCÈS : afficher le message personnalisé (pas alert)
+    showSuccess.value = true
+    setTimeout(() => {
+      showSuccess.value = false
+    }, 2000)
+
     emit('consumed')
 
   } catch (error) {
     console.error('Erreur lors de la consommation:', error)
-    alert('❌ Erreur lors de la consommation. Veuillez réessayer.')
+    errorMessage.value = 'Erreur lors de la consommation. Veuillez réessayer.'
+    showError.value = true
   } finally {
     loading.value = false
   }
@@ -235,5 +283,5 @@ const handleConsume = async () => {
 </script>
 
 <style scoped>
-/* (Pas modifié, inchangé) */
+/* Styles inchangés */
 </style>
