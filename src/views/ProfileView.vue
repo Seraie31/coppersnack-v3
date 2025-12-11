@@ -13,73 +13,113 @@
         <h1 class="text-2xl sm:text-3xl font-bold">Mon Profil</h1>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6 sm:mb-8">
-        <!-- Informations -->
-        <div class="card">
-          <h2 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Informations</h2>
-          
-          <div class="space-y-3 sm:space-y-4">
-            <div>
-              <p class="text-xs sm:text-sm text-gray-400 mb-1">Nom :</p>
-              <p class="text-base sm:text-lg font-semibold">{{ userProfile?.displayName || authStore.user?.displayName || 'Non défini' }}</p>
+      <!-- Card Profil Principal -->
+      <div class="card mb-6">
+        <div class="flex flex-col sm:flex-row items-center gap-6">
+          <!-- Avatar avec initiales -->
+          <div class="relative">
+            <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-primary to-orange-600 flex items-center justify-center text-3xl sm:text-4xl font-bold text-white shadow-lg">
+              {{ getInitials(userProfile?.displayName || authStore.user?.displayName || authStore.user?.email) }}
             </div>
+            <div class="absolute bottom-1 right-1 w-5 h-5 bg-green-500 rounded-full border-4 border-dark-100"></div>
+          </div>
 
-            <div>
-              <p class="text-xs sm:text-sm text-gray-400 mb-1">Email :</p>
-              <p class="text-sm sm:text-lg break-all">{{ authStore.user?.email }}</p>
-            </div>
-
-            <div>
-              <p class="text-xs sm:text-sm text-gray-400 mb-1">Rôle :</p>
-              <p class="text-base sm:text-lg capitalize">
-                <span v-if="userProfile?.role === 'admin'" class="px-3 py-1 bg-orange-600 rounded-full text-sm">
-                  👑 Admin
-                </span>
-                <span v-else class="px-3 py-1 bg-gray-700 rounded-full text-sm">
-                  👤 Utilisateur
-                </span>
-              </p>
+          <!-- Infos utilisateur -->
+          <div class="flex-1 text-center sm:text-left">
+            <h2 class="text-xl sm:text-2xl font-bold mb-2">
+              {{ userProfile?.displayName || authStore.user?.displayName || 'Utilisateur' }}
+            </h2>
+            <p class="text-gray-400 text-sm mb-3">{{ authStore.user?.email }}</p>
+            
+            <!-- Badges -->
+            <div class="flex flex-wrap gap-2 justify-center sm:justify-start">
+              <span v-if="userProfile?.role === 'admin'" class="badge bg-red-500/20 text-red-400">
+                👑 Admin
+              </span>
+              <span v-else class="badge bg-gray-700/60 text-gray-300">
+                👤 Utilisateur
+              </span>
+              <span v-if="favoriteCount > 0" class="badge bg-yellow-500/20 text-yellow-400">
+                ⭐ {{ favoriteCount }} favoris
+              </span>
             </div>
           </div>
-        </div>
 
-        <!-- Mon Solde -->
-        <div class="card">
-          <h2 class="text-xl sm:text-2xl font-bold mb-4 sm:mb-6">Mon Solde</h2>
-          
-          <div class="text-center mb-4 sm:mb-6">
-            <p class="text-4xl sm:text-5xl font-bold mb-2" :class="balance >= 0 ? 'text-green-400' : 'text-red-400'">
+          <!-- Solde -->
+          <div class="text-center bg-dark-200 rounded-xl p-4 sm:p-6 min-w-[140px]">
+            <p class="text-gray-400 text-xs sm:text-sm mb-1">Solde</p>
+            <p class="text-2xl sm:text-3xl font-bold" :class="balanceColor">
               {{ formatCurrency(balance) }}
             </p>
           </div>
+        </div>
+      </div>
 
-          <div class="space-y-3">
-            <div>
-              <label class="block text-xs sm:text-sm font-medium mb-2">Montant à ajouter (€)</label>
-              <input 
-                v-model.number="rechargeAmount" 
-                type="number" 
-                min="1" 
-                step="1"
-                class="input-field text-base"
-              >
-            </div>
+      <!-- Statistiques -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+        <div class="card text-center p-4">
+          <div class="text-2xl sm:text-3xl mb-2">🛒</div>
+          <p class="text-xl sm:text-2xl font-bold text-primary">{{ stats.totalConsumptions }}</p>
+          <p class="text-xs sm:text-sm text-gray-400">Consommations</p>
+        </div>
+        <div class="card text-center p-4">
+          <div class="text-2xl sm:text-3xl mb-2">💰</div>
+          <p class="text-xl sm:text-2xl font-bold text-green-400">{{ formatCurrency(stats.totalSpent) }}</p>
+          <p class="text-xs sm:text-sm text-gray-400">Dépensé</p>
+        </div>
+        <div class="card text-center p-4">
+          <div class="text-2xl sm:text-3xl mb-2">📈</div>
+          <p class="text-xl sm:text-2xl font-bold text-blue-400">{{ formatCurrency(stats.averageSpent) }}</p>
+          <p class="text-xs sm:text-sm text-gray-400">Moyenne</p>
+        </div>
+        <div class="card text-center p-4">
+          <div class="text-2xl sm:text-3xl mb-2">🔥</div>
+          <p class="text-xl sm:text-2xl font-bold text-orange-400">{{ stats.streak }}</p>
+          <p class="text-xs sm:text-sm text-gray-400">Jours actifs</p>
+        </div>
+      </div>
 
-            <button 
-              @click="rechargeBalance" 
-              :disabled="loading || !rechargeAmount || rechargeAmount <= 0"
-              class="btn-primary w-full disabled:opacity-50 text-sm sm:text-base"
-            >
-              {{ loading ? 'Traitement...' : 'Ajouter au solde' }}
-            </button>
-          </div>
+      <!-- Rechargement -->
+      <div class="card mb-6">
+        <h2 class="text-xl sm:text-2xl font-bold mb-4">💳 Recharger mon compte</h2>
+        
+        <!-- Montants rapides -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+          <button
+            v-for="amount in quickAmounts"
+            :key="amount"
+            @click="rechargeAmount = amount"
+            :class="rechargeAmount === amount ? 'border-primary bg-primary/10' : 'border-dark-300'"
+            class="border-2 rounded-lg p-3 sm:p-4 cursor-pointer hover:border-primary transition-all"
+          >
+            <p class="text-lg sm:text-xl font-bold">{{ formatCurrency(amount) }}</p>
+          </button>
+        </div>
+
+        <!-- Montant personnalisé -->
+        <div class="flex gap-3">
+          <input 
+            v-model.number="rechargeAmount" 
+            type="number" 
+            min="1" 
+            step="1"
+            placeholder="Montant personnalisé (€)"
+            class="input-field flex-1"
+          >
+          <button 
+            @click="rechargeBalance" 
+            :disabled="loading || !rechargeAmount || rechargeAmount <= 0"
+            class="btn-primary px-6 disabled:opacity-50"
+          >
+            {{ loading ? 'Traitement...' : 'Confirmer' }}
+          </button>
         </div>
       </div>
 
       <!-- Historique des Transactions -->
       <div class="card">
         <div class="flex items-center justify-between mb-4 sm:mb-6">
-          <h2 class="text-xl sm:text-2xl font-bold">Historique</h2>
+          <h2 class="text-xl sm:text-2xl font-bold">📜 Historique</h2>
           <span class="text-xs sm:text-sm text-gray-400">(10 dernières)</span>
         </div>
 
@@ -87,8 +127,9 @@
           Chargement...
         </div>
 
-        <div v-else-if="transactions.length === 0" class="text-center py-8 text-gray-400">
-          Aucune transaction
+        <div v-else-if="transactions.length === 0" class="text-center py-8">
+          <div class="text-5xl mb-4">📭</div>
+          <p class="text-gray-400">Aucune transaction pour le moment</p>
         </div>
 
         <div v-else class="space-y-2 sm:space-y-3">
@@ -98,7 +139,7 @@
               :key="transaction.id"
               class="flex items-center justify-between p-3 sm:p-4 bg-dark-200 rounded-lg hover:bg-dark-300 transition-colors"
               :class="[
-                transaction.canceled ? 'opacity-60 line-through' : '',
+                transaction.canceled ? 'opacity-60' : '',
                 transaction._anim ? 'hist-flash' : ''
               ]"
             >
@@ -111,7 +152,7 @@
                 </div>
 
                 <div class="min-w-0 flex-1">
-                  <p class="font-semibold text-sm sm:text-base truncate">
+                  <p class="font-semibold text-sm sm:text-base truncate" :class="transaction.canceled ? 'line-through' : ''">
                     {{ transaction.type === 'consumption' ? transaction.productName : 'Rechargement' }}
                   </p>
                   <p class="text-xs sm:text-sm text-gray-400">
@@ -120,8 +161,8 @@
                 </div>
               </div>
 
-              <!-- Montant + Annulation -->
-              <div class="flex items-center gap-3 flex-shrink-0 ml-2">
+              <!-- Montant + Actions -->
+              <div class="flex items-center gap-2 sm:gap-3 flex-shrink-0 ml-2">
                 <div
                   class="text-base sm:text-xl font-bold"
                   :class="transaction.type === 'consumption' ? 'text-red-400' : 'text-green-400'"
@@ -132,14 +173,15 @@
                 <button
                   v-if="transaction.type === 'consumption' && isToday(transaction.date) && !transaction.canceled"
                   @click.stop="handleCancelTransaction(transaction)"
-                  class="text-xs sm:text-sm px-2 py-1 rounded bg-red-900/40 hover:bg-red-700 text-red-200"
+                  class="text-xs px-2 py-1 rounded bg-red-900/40 hover:bg-red-700 text-red-200 transition-colors"
+                  title="Annuler cette consommation"
                 >
-                  Annuler
+                  ✕
                 </button>
 
                 <span
                   v-else-if="transaction.canceled"
-                  class="text-xs text-gray-400 italic"
+                  class="text-xs text-gray-500 italic"
                 >
                   Annulée
                 </span>
@@ -149,6 +191,30 @@
         </div>
       </div>
 
+      <!-- Bouton Déconnexion -->
+      <div class="mt-6">
+        <button @click="handleLogout" class="w-full btn-secondary bg-red-900/40 hover:bg-red-900/60 text-red-400">
+          🚪 Se déconnecter
+        </button>
+      </div>
+    </div>
+
+    <!-- Message de succès -->
+    <div v-if="showSuccess" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+      <div class="bg-dark-100 rounded-xl p-6 max-w-sm mx-4 text-center animate-bounce-in">
+        <div class="text-5xl mb-4">✅</div>
+        <p class="text-lg font-bold mb-2">{{ successMessage }}</p>
+      </div>
+    </div>
+
+    <!-- Message d'erreur -->
+    <div v-if="showError" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+      <div class="bg-dark-100 rounded-xl p-6 max-w-sm mx-4 text-center">
+        <div class="text-5xl mb-4">❌</div>
+        <p class="text-lg font-bold mb-2">Erreur</p>
+        <p class="text-gray-400 mb-4">{{ errorMessage }}</p>
+        <button @click="showError = false" class="btn-primary">OK</button>
+      </div>
     </div>
   </div>
 </template>
@@ -156,23 +222,66 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { collection, query, where, orderBy, limit, getDocs, onSnapshot, addDoc, doc, updateDoc, increment, getDoc, deleteDoc, Timestamp } from 'firebase/firestore'
+import { useRouter } from 'vue-router'
+import { collection, query, where, orderBy, limit, getDocs, onSnapshot, addDoc, doc, updateDoc, increment, deleteDoc, Timestamp } from 'firebase/firestore'
 import { db } from '@/firebase/config'
 import Navbar from '@/components/Navbar.vue'
 
 const authStore = useAuthStore()
+const router = useRouter()
 const userProfile = ref(null)
 const transactions = ref([])
 const rechargeAmount = ref(null)
 const loading = ref(false)
 const loadingTransactions = ref(false)
+const showSuccess = ref(false)
+const showError = ref(false)
+const successMessage = ref('')
+const errorMessage = ref('')
+
+const quickAmounts = [5, 10, 20, 50]
 
 let unsubscribeTransactions = null
 let unsubscribeUserProfile = null
 
-const balance = computed(() => {
-  return userProfile.value?.balance ?? authStore.user?.balance ?? 0
+const balance = computed(() => userProfile.value?.balance ?? 0)
+const favoriteCount = computed(() => userProfile.value?.favorites?.length || 0)
+
+const balanceColor = computed(() => {
+  const bal = balance.value
+  if (bal >= 20) return 'text-green-400'
+  if (bal >= 10) return 'text-orange-400'
+  return 'text-red-400'
 })
+
+const stats = computed(() => {
+  const consumptions = transactions.value.filter(t => t.type === 'consumption' && !t.canceled)
+  const totalSpent = consumptions.reduce((sum, t) => sum + (t.amount || 0), 0)
+  const averageSpent = consumptions.length > 0 ? totalSpent / consumptions.length : 0
+  
+  const uniqueDays = new Set(
+    consumptions.map(t => {
+      const d = t.date?.toDate ? t.date.toDate() : new Date(t.date)
+      return d.toDateString()
+    })
+  )
+  
+  return {
+    totalConsumptions: consumptions.length,
+    totalSpent,
+    averageSpent,
+    streak: uniqueDays.size
+  }
+})
+
+const getInitials = (name) => {
+  if (!name) return '?'
+  const parts = name.trim().split(' ')
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase()
+  }
+  return name.substring(0, 2).toUpperCase()
+}
 
 const formatCurrency = (amount) => {
   return new Intl.NumberFormat('fr-FR', {
@@ -203,16 +312,28 @@ const isToday = (firestoreDate) => {
   )
 }
 
+const showSuccessMessage = (message) => {
+  successMessage.value = message
+  showSuccess.value = true
+  setTimeout(() => {
+    showSuccess.value = false
+  }, 2000)
+}
+
+const showErrorMessage = (message) => {
+  errorMessage.value = message
+  showError.value = true
+}
+
 const handleCancelTransaction = async (transaction) => {
   if (!isToday(transaction.date)) {
-    alert('Vous ne pouvez annuler que les consommations du jour.')
+    showErrorMessage('Vous ne pouvez annuler que les consommations du jour')
     return
   }
 
-  const ok = confirm(
-    `Annuler la consommation de "${transaction.productName}" du ${formatDate(transaction.date)} ?`
-  )
-  if (!ok) return
+  if (!confirm(`Annuler la consommation de "${transaction.productName}" ?`)) {
+    return
+  }
 
   try {
     const userRef = doc(db, 'users', transaction.userId)
@@ -234,21 +355,16 @@ const handleCancelTransaction = async (transaction) => {
     const t = transactions.value.find(t => t.id === transaction.id)
     if (t) {
       t.canceled = true
-      t.canceledAt = new Date()
       t._anim = true
       setTimeout(() => {
         t._anim = false
       }, 400)
     }
 
-    if (userProfile.value) {
-      userProfile.value.balance += transaction.amount
-    }
-
-    alert('✅ Consommation annulée avec succès')
+    showSuccessMessage('Consommation annulée !')
   } catch (error) {
-    console.error('Erreur annulation transaction :', error)
-    alert('❌ Erreur lors de l\'annulation. Veuillez réessayer.')
+    console.error('Erreur annulation transaction:', error)
+    showErrorMessage('Erreur lors de l\'annulation')
   }
 }
 
@@ -318,7 +434,7 @@ const cleanOldTransactions = async () => {
 
 const rechargeBalance = async () => {
   if (!rechargeAmount.value || rechargeAmount.value <= 0) {
-    alert('Montant invalide')
+    showErrorMessage('Montant invalide')
     return
   }
 
@@ -332,6 +448,7 @@ const rechargeBalance = async () => {
 
     await addDoc(collection(db, 'transactions'), {
       userId: authStore.user.uid,
+      userName: authStore.user.displayName || authStore.user.email,
       amount: rechargeAmount.value,
       type: 'recharge',
       date: Timestamp.now()
@@ -339,16 +456,20 @@ const rechargeBalance = async () => {
 
     await cleanOldTransactions()
 
-    await loadUserProfile()
-    await loadTransactions()
-    
-    alert(`✅ Rechargement de ${rechargeAmount.value} € effectué !`)
+    showSuccessMessage(`+${formatCurrency(rechargeAmount.value)} ajoutés !`)
     rechargeAmount.value = null
   } catch (error) {
     console.error('Erreur rechargement:', error)
-    alert('❌ Erreur lors du rechargement')
+    showErrorMessage('Erreur lors du rechargement')
   } finally {
     loading.value = false
+  }
+}
+
+const handleLogout = async () => {
+  if (confirm('Voulez-vous vraiment vous déconnecter ?')) {
+    await authStore.logout()
+    router.push('/login')
   }
 }
 
@@ -368,6 +489,10 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.badge {
+  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-bold;
+}
+
 .hist-enter-from,
 .hist-leave-to {
   opacity: 0;
@@ -388,5 +513,22 @@ onUnmounted(() => {
 }
 .hist-flash {
   animation: histFlash 0.4s ease-out;
+}
+
+@keyframes bounce-in {
+  0% {
+    transform: scale(0.8);
+    opacity: 0;
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+.animate-bounce-in {
+  animation: bounce-in 0.3s ease-out;
 }
 </style>
