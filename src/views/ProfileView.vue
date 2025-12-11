@@ -62,7 +62,6 @@
                 min="1" 
                 step="1"
                 class="input-field text-base"
-                placeholder="5"
               >
             </div>
 
@@ -155,9 +154,9 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useAuthStore } from '@/stores/auth'
-import { collection, query, where, orderBy, limit, getDocs, addDoc, doc, updateDoc, increment, getDoc, deleteDoc } from 'firebase/firestore'
+import { collection, query, where, orderBy, limit, getDocs, onSnapshot, addDoc, doc, updateDoc, increment, getDoc, deleteDoc, Timestamp } from 'firebase/firestore'
 import { db } from '@/firebase/config'
 import Navbar from '@/components/Navbar.vue'
 
@@ -167,6 +166,9 @@ const transactions = ref([])
 const rechargeAmount = ref(null)
 const loading = ref(false)
 const loadingTransactions = ref(false)
+
+let unsubscribeTransactions = null
+let unsubscribeUserProfile = null
 
 const balance = computed(() => {
   return userProfile.value?.balance ?? authStore.user?.balance ?? 0
@@ -213,26 +215,22 @@ const handleCancelTransaction = async (transaction) => {
   if (!ok) return
 
   try {
-    // 1. Re-créditer le solde utilisateur
     const userRef = doc(db, 'users', transaction.userId)
     await updateDoc(userRef, {
       balance: increment(transaction.amount)
     })
 
-    // 2. Ré-incrémenter le stock du produit
     const productRef = doc(db, 'products', transaction.productId)
     await updateDoc(productRef, {
       stockFrigo: increment(1)
     })
 
-    // 3. Marquer la transaction comme annulée
     const transactionRef = doc(db, 'transactions', transaction.id)
     await updateDoc(transactionRef, {
       canceled: true,
-      canceledAt: new Date()
+      canceledAt: Timestamp.now()
     })
 
-    // ✅ Mise à jour immédiate pour l’UI
     const t = transactions.value.find(t => t.id === transaction.id)
     if (t) {
       t.canceled = true
@@ -243,7 +241,6 @@ const handleCancelTransaction = async (transaction) => {
       }, 400)
     }
 
-    // ✅ Mettre à jour le solde affiché
     if (userProfile.value) {
       userProfile.value.balance += transaction.amount
     }
@@ -251,61 +248,68 @@ const handleCancelTransaction = async (transaction) => {
     alert('✅ Consommation annulée avec succès')
   } catch (error) {
     console.error('Erreur annulation transaction :', error)
-    alert('❌ Erreur lors de l’annulation. Veuillez réessayer.')
+    alert('❌ Erreur lors de l\'annulation. Veuillez réessayer.')
   }
 }
 
-const loadUserProfile = async () => {
-  try {
-    const userDoc = await getDoc(doc(db, 'users', authStore.user.uid))
-    if (userDoc.exists()) {
-      userProfile.value = userDoc.data()
+const loadUserProfile = () => {
+  const userDocRef = doc(db, 'users', authStore.user.uid)
+  
+  unsubscribeUserProfile = onSnapshot(userDocRef, (docSnapshot) => {
+    if (docSnapshot.exists()) {
+      userProfile.value = docSnapshot.data()
     }
-  } catch (error) {
-    console.error('Erreur chargement profil:', error)
-  }
+  }, (error) => {
+    console.error('Erreur écoute profil:', error)
+  })
 }
 
-const loadTransactions = async () => {
-  try {
-    loadingTransactions.value = true
-    const q = query(
-      collection(db, 'transactions'),
-      where('userId', '==', authStore.user.uid),
-      orderBy('date', 'desc'),
-      limit(10)
-    )
-    
-    const snapshot = await getDocs(q)
+const loadTransactions = () => {
+  loadingTransactions.value = true
+  
+  const q = query(
+    collection(db, 'transactions'),
+    where('userId', '==', authStore.user.uid),
+    orderBy('date', 'desc'),
+    limit(10)
+  )
+  
+  unsubscribeTransactions = onSnapshot(q, (snapshot) => {
     transactions.value = snapshot.docs.map(transactionDoc => ({
       id: transactionDoc.id,
       ...transactionDoc.data()
     }))
-  } catch (error) {
-    console.error('Erreur chargement transactions:', error)
-  } finally {
     loadingTransactions.value = false
-  }
+  }, (error) => {
+    console.error('Erreur écoute transactions:', error)
+    loadingTransactions.value = false
+  })
 }
 
-// 🗑️ Suppression auto des anciennes transactions
 const cleanOldTransactions = async () => {
   try {
-    const q = query(
+    const countQuery = query(
       collection(db, 'transactions'),
-      where('userId', '==', authStore.user.uid),
-      orderBy('date', 'desc')
+      where('userId', '==', authStore.user.uid)
     )
-    
-    const snapshot = await getDocs(q)
-    const allTransactions = snapshot.docs
-    
-    if (allTransactions.length > 10) {
-      const transactionsToDelete = allTransactions.slice(10)
+    const countSnapshot = await getDocs(countQuery)
+    const totalTransactions = countSnapshot.size
+
+    if (totalTransactions > 10) {
+      const oldTransactionsQuery = query(
+        collection(db, 'transactions'),
+        where('userId', '==', authStore.user.uid),
+        orderBy('date', 'asc'),
+        limit(totalTransactions - 10)
+      )
+
+      const oldSnapshot = await getDocs(oldTransactionsQuery)
       
-      for (const transactionDoc of transactionsToDelete) {
-        await deleteDoc(doc(db, 'transactions', transactionDoc.id))
-      }
+      const deletePromises = oldSnapshot.docs.map(transactionDoc => 
+        deleteDoc(doc(db, 'transactions', transactionDoc.id))
+      )
+      
+      await Promise.all(deletePromises)
     }
   } catch (error) {
     console.error('Erreur nettoyage transactions:', error)
@@ -330,7 +334,7 @@ const rechargeBalance = async () => {
       userId: authStore.user.uid,
       amount: rechargeAmount.value,
       type: 'recharge',
-      date: new Date()
+      date: Timestamp.now()
     })
 
     await cleanOldTransactions()
@@ -349,8 +353,17 @@ const rechargeBalance = async () => {
 }
 
 onMounted(async () => {
-  await loadUserProfile()
-  await loadTransactions()
+  loadUserProfile()
+  loadTransactions()
+})
+
+onUnmounted(() => {
+  if (unsubscribeTransactions) {
+    unsubscribeTransactions()
+  }
+  if (unsubscribeUserProfile) {
+    unsubscribeUserProfile()
+  }
 })
 </script>
 

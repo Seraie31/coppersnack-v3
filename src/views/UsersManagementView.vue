@@ -599,7 +599,7 @@ const saveUser = async () => {
   }
 }
 
-// Supprimer un utilisateur
+ // Supprimer un utilisateur
 const confirmDelete = async (user) => {
   if (user.id === authStore.user.uid) {
     showNotification('error', 'Action impossible', 'Vous ne pouvez pas supprimer votre propre compte')
@@ -628,18 +628,22 @@ const confirmDelete = async (user) => {
 
   try {
     loading.value = true
+    console.log('⚙️ confirmDelete for user.id =', user.id, 'auth uid =', authStore.user?.uid)
 
     // 1. Supprimer les transactions liées
+    console.log('🧾 deleting transactions for userId =', user.id)
     const transactionsRef = collection(db, 'transactions')
     const userTransactionsQuery = query(transactionsRef, where('userId', '==', user.id))
     const transactionsSnapshot = await getDocs(userTransactionsQuery)
     
-    const deletePromises = transactionsSnapshot.docs.map(transDoc => 
-      deleteDoc(doc(db, 'transactions', transDoc.id))
-    )
+    const deletePromises = transactionsSnapshot.docs.map(transDoc => {
+      console.log('💣 delete transaction docId =', transDoc.id)
+      return deleteDoc(doc(db, 'transactions', transDoc.id))
+    })
     await Promise.all(deletePromises)
 
     // 2. Supprimer l'utilisateur
+    console.log('🗑 delete user doc users/', user.id)
     await deleteDoc(doc(db, 'users', user.id))
 
     // 3. Mise à jour locale
