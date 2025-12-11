@@ -77,40 +77,76 @@ const userFavorites = ref([])
 const loadingFavorites = ref(false)
 
 const filteredProducts = computed(() => {
+  // Vérification stricte des produits
   if (!productsStore.products || productsStore.products.length === 0) {
     return []
   }
 
+  let filtered = []
+
   if (filterCategory.value === 'all') {
-    return productsStore.products.filter(p => p && p.id)
+    // Filtrer TOUS les produits valides avec TOUTES les propriétés requises
+    filtered = productsStore.products.filter(p => 
+      p && 
+      p.id && 
+      p.name && 
+      typeof p.price === 'number' &&
+      typeof p.stockFrigo === 'number'
+    )
+  } else if (filterCategory.value === 'favorites') {
+    // Filtrer favoris valides
+    filtered = productsStore.products.filter(p => 
+      p && 
+      p.id && 
+      p.name && 
+      typeof p.price === 'number' &&
+      typeof p.stockFrigo === 'number' &&
+      userFavorites.value.includes(p.id)
+    )
+  } else {
+    // Filtrer par catégorie
+    filtered = productsStore.products.filter(p => 
+      p && 
+      p.id && 
+      p.name && 
+      typeof p.price === 'number' &&
+      typeof p.stockFrigo === 'number' &&
+      p.category === filterCategory.value
+    )
   }
 
-  if (filterCategory.value === 'favorites') {
-    return productsStore.products.filter(p => p && p.id && userFavorites.value.includes(p.id))
-  }
-  
-  return productsStore.products.filter(p => p && p.id && p.category === filterCategory.value)
+  // Tri : favoris d'abord, puis les autres
+  return filtered.sort((a, b) => {
+    const aIsFav = userFavorites.value.includes(a.id) ? 1 : 0
+    const bIsFav = userFavorites.value.includes(b.id) ? 1 : 0
+    return bIsFav - aIsFav  // favoris (1) avant non-favoris (0)
+  })
 })
 
 const loadUserFavorites = async () => {
-  if (!authStore.user) return
+  if (!authStore.user) {
+    userFavorites.value = []
+    return
+  }
 
   try {
     loadingFavorites.value = true
     const userDoc = await getDoc(doc(db, 'users', authStore.user.uid))
     if (userDoc.exists()) {
       userFavorites.value = userDoc.data().favorites || []
+    } else {
+      userFavorites.value = []
     }
   } catch (error) {
     console.error('Erreur chargement favoris:', error)
+    userFavorites.value = []
   } finally {
     loadingFavorites.value = false
   }
 }
 
 const handleConsumed = () => {
-  // Plus besoin de refetch, le onSnapshot mettra à jour tout seul
-  // productsStore.fetchProducts()
+  // Le onSnapshot met à jour automatiquement
 }
 
 onMounted(async () => {
