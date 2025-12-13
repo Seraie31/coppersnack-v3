@@ -54,6 +54,49 @@
         </div>
       </div>
 
+      <!-- Alerte PRIORITAIRE : Réserve vide (À COMMANDER) -->
+<div v-if="emptyReserveProducts.length > 0" class="card bg-purple-900/20 border border-purple-700/50 mb-6">
+  <div class="flex items-center gap-3 mb-4">
+    <span class="text-3xl">🛒</span>
+    <div class="flex-1">
+      <h3 class="text-lg sm:text-xl font-bold text-purple-400">À commander ! ({{ emptyReserveProducts.length }} produits)</h3>
+      <p class="text-xs sm:text-sm text-gray-400">Stock réserve vide - Déclencher un achat</p>
+    </div>
+    <button 
+      @click="generateShoppingList"
+      class="px-3 sm:px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg text-xs sm:text-sm font-bold transition-colors"
+    >
+      📋 Liste
+    </button>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <span 
+      v-for="product in emptyReserveProducts" 
+      :key="product.id"
+      class="px-2 sm:px-3 py-1 bg-purple-900/40 rounded-full text-xs sm:text-sm font-bold"
+    >
+      {{ product.name }}: R{{ product.stockReserve || 0 }} | F{{ product.stockFrigo || 0 }}
+    </span>
+  </div>
+</div>
+
+<!-- Alerte Rupture Frigo -->
+<div v-if="outOfStockProducts.length > 0" class="card bg-orange-900/20 border border-orange-700/50 mb-6">
+  <div class="flex items-center gap-3 mb-3">
+    <span class="text-2xl">🚫</span>
+    <h3 class="text-lg font-bold text-orange-400">Rupture frigo ({{ outOfStockProducts.length }} produits)</h3>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <span 
+      v-for="product in outOfStockProducts" 
+      :key="product.id"
+      class="px-2 sm:px-3 py-1 bg-orange-900/40 rounded-full text-xs sm:text-sm"
+    >
+      {{ product.name }}
+    </span>
+  </div>
+</div>
+
       <!-- Alertes Stock Bas -->
       <div v-if="lowStockProducts.length > 0" class="card bg-red-900/20 border border-red-700/50 mb-6">
         <div class="flex items-center gap-3 mb-3">
@@ -773,6 +816,16 @@ const canAddProduct = computed(() => {
          newProduct.value.stockReserve >= 0
 })
 
+// Produits avec stock réserve vide (À COMMANDER)
+const emptyReserveProducts = computed(() => {
+  return products.value.filter(p => (p.stockReserve || 0) === 0)
+})
+
+// Produits en rupture frigo
+const outOfStockProducts = computed(() => {
+  return products.value.filter(p => (p.stockFrigo || 0) === 0)
+})
+
 const showSuccessMessage = (message) => {
   successMessage.value = message
   showSuccess.value = true
@@ -1039,6 +1092,32 @@ const applyAdjustFridge = async () => {
     console.error('Erreur ajustement frigo:', e)
     showErrorMessage('Erreur lors de l\'ajustement')
   }
+}
+
+// Générer liste de courses
+const generateShoppingList = () => {
+  if (emptyReserveProducts.value.length === 0) {
+    showErrorMessage('Aucun produit à commander')
+    return
+  }
+
+  let shoppingList = '📋 LISTE DE COURSES - CopperSnack\n'
+  shoppingList += '================================\n\n'
+  
+  emptyReserveProducts.value.forEach((product, index) => {
+    shoppingList += `${index + 1}. ${product.name}\n`
+    shoppingList += `   Catégorie: ${product.category === 'boissons' ? '🥤 Boisson' : '🍫 Snack'}\n`
+    shoppingList += `   Stock: Réserve ${product.stockReserve || 0} | Frigo ${product.stockFrigo || 0}\n`
+    shoppingList += `   Quantité suggérée: 20 unités\n\n`
+  })
+  
+  shoppingList += `\n📊 Total: ${emptyReserveProducts.value.length} produits`
+
+  navigator.clipboard.writeText(shoppingList).then(() => {
+    showSuccessMessage('Liste de courses copiée dans le presse-papier !')
+  }).catch(() => {
+    alert(shoppingList)
+  })
 }
 </script>
 
