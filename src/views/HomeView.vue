@@ -201,7 +201,7 @@ const filteredProducts = computed(() => {
       typeof p.price === 'number' &&
       typeof p.stockFrigo === 'number' &&
       p.promotion?.active &&
-      isPromotionValid(p.promotion)
+      isPromotionValid(p.promotion, p)
     )
   } else {
     filtered = productsStore.products.filter(p =>
@@ -225,22 +225,14 @@ const filteredProducts = computed(() => {
   // ✨ NOUVEAU TRI AVEC PROMOTIONS EN PRIORITÉ
   return filtered.sort((a, b) => {
     // 🏷️ PRIORITÉ 1 : Promotions EN PREMIER
-    const aHasPromo = a.promotion?.active && isPromotionValid(a.promotion)
-    const bHasPromo = b.promotion?.active && isPromotionValid(b.promotion)
-
+    const aHasPromo = a.promotion?.active && isPromotionValid(a.promotion, a)
+    const bHasPromo = b.promotion?.active && isPromotionValid(b.promotion, b)
+    
     if (aHasPromo !== bHasPromo) {
       return bHasPromo ? 1 : -1  // Promo en premier
     }
 
-    // 🚨 PRIORITÉ 2 : Produits en stock AVANT produits en rupture
-    const aOutOfStock = a.stockFrigo === 0 ? 1 : 0
-    const bOutOfStock = b.stockFrigo === 0 ? 1 : 0
-
-    if (aOutOfStock !== bOutOfStock) {
-      return aOutOfStock - bOutOfStock  // Rupture (1) après disponible (0)
-    }
-
-    // ⭐ PRIORITÉ 3 : Favoris ensuite
+    // ⭐ PRIORITÉ 2 : Favoris ensuite
     const aIsFav = userFavorites.value.includes(a.id)
     const bIsFav = userFavorites.value.includes(b.id)
 
@@ -248,26 +240,34 @@ const filteredProducts = computed(() => {
       return bIsFav ? 1 : -1  // Favoris en premier
     }
 
+    // 🚨 PRIORITÉ 3 : Produits en stock AVANT produits en rupture
+    const aOutOfStock = a.stockFrigo === 0 ? 1 : 0
+    const bOutOfStock = b.stockFrigo === 0 ? 1 : 0
+    
+    if (aOutOfStock !== bOutOfStock) {
+      return aOutOfStock - bOutOfStock  // Rupture (1) après disponible (0)
+    }
+
     // 📊 PRIORITÉ 4 : Appliquer le tri choisi
     switch (sortBy.value) {
       case 'favorites':
         return a.name.localeCompare(b.name)
-
+      
       case 'price-asc':
         return a.price - b.price
-
+      
       case 'price-desc':
         return b.price - a.price
-
+      
       case 'stock-asc':
         return a.stockFrigo - b.stockFrigo
-
+      
       case 'stock-desc':
         return b.stockFrigo - a.stockFrigo
-
+      
       case 'name':
         return a.name.localeCompare(b.name)
-
+      
       default:
         return a.name.localeCompare(b.name)
     }
@@ -275,16 +275,23 @@ const filteredProducts = computed(() => {
 })
 
 // ✨ NOUVELLE FONCTION : Vérifier si une promo est valide
-const isPromotionValid = (promo) => {
+const isPromotionValid = (promo, product) => {
   if (!promo || !promo.active) return false
-
+  
   // Vérifier date de fin
   if (promo.endDate) {
     const now = new Date()
     const endDate = promo.endDate.toDate ? promo.endDate.toDate() : new Date(promo.endDate)
     if (now > endDate) return false
   }
-
+  
+  // ✅ NOUVEAU : Vérifier stock limité
+  if (promo.maxStock && product) {
+    if (product.stockFrigo > promo.maxStock) {
+      return false  // Promo désactivée si stock dépasse la limite
+    }
+  }
+  
   return true
 }
 
