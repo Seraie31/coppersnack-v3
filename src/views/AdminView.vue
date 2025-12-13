@@ -12,7 +12,7 @@
       </div>
 
       <!-- Statistiques Rapides -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6 mb-6 sm:mb-8">
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-6 mb-6 sm:mb-8">
         <div class="card bg-gradient-to-br from-blue-900/50 to-blue-800/30 border border-blue-700/50 p-4">
           <div class="flex items-center justify-between">
             <div>
@@ -50,6 +50,16 @@
               <p class="text-xl sm:text-3xl font-bold text-orange-400">{{ formatCurrency(cseBalance) }}</p>
             </div>
             <div class="text-3xl sm:text-5xl">💼</div>
+          </div>
+        </div>
+
+        <div class="card bg-gradient-to-br from-yellow-900/50 to-yellow-800/30 border border-yellow-700/50 p-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <p class="text-xs sm:text-sm text-gray-400 mb-1">Promos actives</p>
+              <p class="text-2xl sm:text-3xl font-bold text-yellow-400">{{ activePromotionsCount }}</p>
+            </div>
+            <div class="text-3xl sm:text-5xl">🏷️</div>
           </div>
         </div>
       </div>
@@ -307,6 +317,7 @@
                       <th class="text-left py-3 px-4 text-sm">Produit</th>
                       <th class="text-left py-3 px-4 text-sm">Catégorie</th>
                       <th class="text-right py-3 px-4 text-sm">Prix</th>
+                      <th class="text-center py-3 px-4 text-sm">🏷️ Promo</th>
                       <th class="text-center py-3 px-4 text-sm">🏪 Réserve</th>
                       <th class="text-center py-3 px-4 text-sm">🧊 Frigo</th>
                       <th class="text-center py-3 px-4 text-sm">Transfert</th>
@@ -340,6 +351,41 @@
                         {{ formatCurrency(product.price) }}
                       </td>
                       
+                      <!-- ✨ NOUVELLE CELLULE PROMO -->
+                      <td class="py-3 px-4 text-center">
+                        <!-- Si pas de promo active -->
+                        <button 
+                          v-if="!product.promotion?.active"
+                          @click="createPromotion(product)"
+                          class="px-2 py-1 bg-yellow-600 hover:bg-yellow-700 rounded text-xs whitespace-nowrap"
+                        >
+                          🏷️ Créer
+                        </button>
+                        
+                        <!-- Si promo active -->
+                        <div v-else class="flex flex-col gap-1">
+                          <span class="px-2 py-1 bg-yellow-900/40 text-yellow-400 rounded text-xs font-bold">
+                            -{{ product.promotion.discount }}%
+                          </span>
+                          <div class="flex gap-1 justify-center">
+                            <button 
+                              @click="editPromotion(product)"
+                              class="px-2 py-1 bg-blue-600 hover:bg-blue-700 rounded text-xs"
+                              title="Modifier"
+                            >
+                              ✏️
+                            </button>
+                            <button 
+                              @click="disablePromotion(product)"
+                              class="px-2 py-1 bg-red-600 hover:bg-red-700 rounded text-xs"
+                              title="Désactiver"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        </div>
+                      </td>
+
                       <td class="py-3 px-4 text-center">
                         <div class="flex items-center justify-center gap-1">
                           <button 
@@ -459,7 +505,15 @@
                     <span class="text-4xl" v-else>📦</span>
                     <div class="flex-1">
                       <h4 class="font-bold">{{ product.name }}</h4>
-                      <p class="text-primary font-bold">{{ formatCurrency(product.price) }}</p>
+                      <div class="flex items-center gap-2">
+                        <p class="text-primary font-bold">{{ formatCurrency(product.price) }}</p>
+                        <span 
+                          v-if="product.promotion?.active" 
+                          class="px-2 py-1 bg-yellow-900/40 text-yellow-400 rounded text-xs font-bold"
+                        >
+                          🏷️ -{{ product.promotion.discount }}%
+                        </span>
+                      </div>
                       <span class="text-xs px-2 py-1 bg-dark-400 rounded-full">
                         {{ product.category === 'boissons' ? '🥤 Boisson' : '🍫 Snack' }}
                       </span>
@@ -480,6 +534,22 @@
                   </div>
 
                   <div class="flex gap-2">
+                    <!-- ✨ BOUTON PROMO -->
+                    <button 
+                      v-if="!product.promotion?.active"
+                      @click="createPromotion(product)"
+                      class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-xs py-2"
+                    >
+                      🏷️ Promo
+                    </button>
+                    <button 
+                      v-else
+                      @click="editPromotion(product)"
+                      class="flex-1 bg-yellow-600 hover:bg-yellow-700 text-white rounded-lg text-xs py-2"
+                    >
+                      ✏️ Promo
+                    </button>
+                    
                     <button 
                       @click="openEditModal(product)"
                       class="flex-1 btn-secondary text-xs py-2"
@@ -722,10 +792,19 @@
         <button @click="showError = false" class="btn-primary w-full">OK</button>
       </div>
     </div>
+    <!-- Modal Promotion -->
+    <PromotionModal
+      :show="showPromotionModal"
+      :product="selectedProductForPromo"
+      :edit-mode="editPromotionMode"
+      @close="showPromotionModal = false"
+      @save="savePromotion"
+    />
   </div>
 </template>
 
 <script setup>
+import PromotionModal from '@/components/PromotionModal.vue'
 import { ref, computed, onMounted } from 'vue'
 import { useProductsStore } from '@/stores/products'
 import { useAuthStore } from '@/stores/auth'
@@ -748,7 +827,10 @@ const showSuccess = ref(false)
 const showError = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
-
+// ✨ PROMO - Ajouter ces 3 lignes
+const showPromotionModal = ref(false)
+const selectedProductForPromo = ref(null)
+const editPromotionMode = ref(false)
 const searchQuery = ref('')
 const filterCategory = ref('all')
 
@@ -824,6 +906,11 @@ const emptyReserveProducts = computed(() => {
 // Produits en rupture frigo
 const outOfStockProducts = computed(() => {
   return products.value.filter(p => (p.stockFrigo || 0) === 0)
+})
+
+// ✨ Compter les promos actives
+const activePromotionsCount = computed(() => {
+  return products.value.filter(p => p.promotion?.active).length
 })
 
 const showSuccessMessage = (message) => {
@@ -1118,6 +1205,52 @@ const generateShoppingList = () => {
   }).catch(() => {
     alert(shoppingList)
   })
+}
+// ✨ GESTION PROMOTIONS
+
+const createPromotion = (product) => {
+  selectedProductForPromo.value = product
+  editPromotionMode.value = false
+  showPromotionModal.value = true
+}
+
+const editPromotion = (product) => {
+  selectedProductForPromo.value = product
+  editPromotionMode.value = true
+  showPromotionModal.value = true
+}
+
+const savePromotion = async ({ productId, promotion }) => {
+  try {
+    const productRef = doc(db, 'products', productId)
+    await updateDoc(productRef, {
+      promotion: promotion
+    })
+    
+    showSuccessMessage('✅ Promotion créée !')
+    showPromotionModal.value = false
+    await productsStore.fetchProducts()
+  } catch (error) {
+    console.error('Erreur promotion:', error)
+    showErrorMessage('Erreur lors de la création')
+  }
+}
+
+const disablePromotion = async (product) => {
+  if (!confirm(`Désactiver la promotion sur ${product.name} ?`)) return
+  
+  try {
+    const productRef = doc(db, 'products', product.id)
+    await updateDoc(productRef, {
+      'promotion.active': false
+    })
+    
+    showSuccessMessage('✅ Promotion désactivée')
+    await productsStore.fetchProducts()
+  } catch (error) {
+    console.error('Erreur:', error)
+    showErrorMessage('Erreur')
+  }
 }
 </script>
 

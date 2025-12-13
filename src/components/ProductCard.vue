@@ -1,6 +1,11 @@
 <template>
-  <div v-if="product" class="card relative" :class="{ 'opacity-50': isOutOfStock }">
+  <div v-if="product" class="card relative" :class="{ 'opacity-50': isOutOfStock, 'on-promotion': hasActivePromotion }">
     
+    <!-- BADGE PROMOTION -->
+    <div v-if="hasActivePromotion" class="promo-badge">
+      🏷️ -{{ product.promotion.discount }}%
+    </div>
+
     <!-- FAVORIS -->
     <button 
       @click.stop="toggleFavorite"
@@ -41,9 +46,20 @@
     
     <!-- PRIX + STOCK -->
     <div class="flex items-center justify-between mb-4">
-      <span class="text-2xl font-bold text-primary">
-        {{ formatCurrency(product.price) }}
-      </span>
+      <div class="flex items-baseline gap-2">
+        <span 
+          v-if="hasActivePromotion" 
+          class="text-lg font-bold text-gray-500 line-through"
+        >
+          {{ formatCurrency(product.price) }}
+        </span>
+        <span 
+          class="text-2xl font-bold"
+          :class="hasActivePromotion ? 'text-orange-400' : 'text-primary'"
+        >
+          {{ formatCurrency(finalPrice) }}
+        </span>
+      </div>
       <span 
         class="text-sm font-bold px-2 py-1 rounded"
         :class="getStockClass(product.stockFrigo || 0)"
@@ -52,34 +68,48 @@
       </span>
     </div>
 
+    <!-- INFO PROMO -->
+    <div v-if="hasActivePromotion && (promotionInfo.endDate || promotionInfo.maxStock)" class="promo-info mb-3">
+      <div v-if="promotionInfo.endDate" class="promo-detail">
+        ⏰ Jusqu'au {{ formatDate(promotionInfo.endDate) }}
+      </div>
+      <div v-if="promotionInfo.maxStock" class="promo-detail">
+        🎯 Limité à {{ promotionInfo.maxStock }} unités
+      </div>
+    </div>
+
     <!-- BOUTON CONSOMMER -->
     <button 
       @click="showConfirm = true" 
       :disabled="isOutOfStock || loading"
       class="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+      :class="{ 'promo-btn': hasActivePromotion }"
     >
-      {{ loading ? 'Traitement...' : 'Consommer' }}
+      {{ loading ? 'Traitement...' : 'Consommer ' + formatCurrency(finalPrice) }}
     </button>
 
     <!-- CONFIRMATION -->
     <ConfirmModal
       :show="showConfirm"
       :title="`Confirmer la consommation`"
-      :message="'Vous êtes sur le point de consommer ' + product.name + ' pour ' + formatCurrency(product.price)"
+      :message="confirmMessage"
       @cancel="showConfirm = false"
       @confirm="handleConfirm"
     />
 
-    <!-- MESSAGE DE SUCCÈS (remplace alert) -->
+    <!-- MESSAGE DE SUCCÈS -->
     <div v-if="showSuccess" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
       <div class="bg-dark-100 rounded-xl p-6 max-w-sm mx-4 text-center">
         <div class="text-5xl mb-4">✅</div>
         <p class="text-lg font-bold mb-2">{{ product.name }}</p>
         <p class="text-gray-400">consommé(e) avec succès !</p>
+        <p v-if="hasActivePromotion" class="text-green-400 mt-2">
+          Économie : {{ formatCurrency(product.price - finalPrice) }}
+        </p>
       </div>
     </div>
 
-    <!-- MESSAGE D'ERREUR (remplace alert) -->
+    <!-- MESSAGE D'ERREUR -->
     <div v-if="showError" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
       <div class="bg-dark-100 rounded-xl p-6 max-w-sm mx-4 text-center">
         <div class="text-5xl mb-4">❌</div>
@@ -135,10 +165,70 @@ const authStore = useAuthStore()
 const isOutOfStock = computed(() => props.product.stockFrigo === 0)
 const isFavorite = computed(() => props.favorites.includes(props.product.id))
 
+// ✨ NOUVEAU : Vérifier si une promotion est active
+const hasActivePromotion = computed(() => {
+  const promo = props.product.promotion
+  if (!promo || !promo.active) return false
+
+  // Vérifier la date de fin
+  if (promo.endDate) {
+    const now = new Date()
+    const endDate = promo.endDate.toDate ? promo.endDate.toDate() : new Date(promo.endDate)
+    if (now > endDate) return false
+  }
+
+  // Vérifier le stock limité
+  if (promo.maxStock && props.product.stockFrigo > promo.maxStock) {
+    return false
+  }
+
+  return true
+})
+
+// ✨ NOUVEAU : Infos de la promotion
+const promotionInfo = computed(() => {
+  if (!hasActivePromotion.value) return null
+  return props.product.promotion
+})
+
+// ✨ NOUVEAU : Prix final après réduction
+const finalPrice = computed(() => {
+  if (!hasActivePromotion.value) {
+    return props.product.price
+  }
+  
+  const discount = props.product.promotion.discount / 100
+  return props.product.price * (1 - discount)
+})
+
+// ✨ NOUVEAU : Message de confirmation avec promo
+const confirmMessage = computed(() => {
+  let msg = `Vous êtes sur le point de consommer ${props.product.name}`
+  
+  if (hasActivePromotion.value) {
+    msg += ` en promotion pour ${formatCurrency(finalPrice.value)}`
+    msg += ` (au lieu de ${formatCurrency(props.product.price)})`
+  } else {
+    msg += ` pour ${formatCurrency(finalPrice.value)}`
+  }
+  
+  return msg
+})
+
 /* --------------------- UTILS --------------------- */
 
 const formatCurrency = (amount) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(amount || 0)
+
+const formatDate = (date) => {
+  if (!date) return ''
+  const d = date.toDate ? date.toDate() : new Date(date)
+  return new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric'
+  }).format(d)
+}
 
 const getStockClass = (stock) => {
   if (stock === 0) return 'bg-red-900/40 text-red-400'
@@ -214,7 +304,7 @@ const handleConfirm = () => {
 }
 
 const handleConsume = async () => {
-  // Vérifications (SANS alert)
+  // Vérifications
   if (props.product.stockFrigo === 0) {
     errorMessage.value = 'Produit en rupture de stock'
     showError.value = true
@@ -234,9 +324,12 @@ const handleConsume = async () => {
     const productRef = doc(db, 'products', props.product.id)
     const frigoRef = doc(db, 'cashRegisters', 'frigo')
 
+    // ✨ MODIFIÉ : Utiliser le prix final (avec promo si applicable)
+    const amountToCharge = finalPrice.value
+
     // Mise à jour du solde utilisateur
     await updateDoc(userRef, {
-      balance: increment(-props.product.price)
+      balance: increment(-amountToCharge)
     })
 
     // Mise à jour stock produit
@@ -246,25 +339,29 @@ const handleConsume = async () => {
 
     // Mise à jour caisse frigo
     await updateDoc(frigoRef, {
-      balance: increment(props.product.price),
+      balance: increment(amountToCharge),
       lastUpdate: Timestamp.now()
     })
 
-    // Création transaction
+    // ✨ MODIFIÉ : Création transaction avec infos promo
     await addDoc(collection(db, 'transactions'), {
       userId: authStore.user.uid,
       userName: authStore.user.displayName || authStore.user.email,
       productId: props.product.id,
       productName: props.product.name,
-      amount: props.product.price,
+      amount: amountToCharge,
       type: 'consumption',
-      date: Timestamp.now()
+      date: Timestamp.now(),
+      // ✨ NOUVEAU : Infos promo
+      isPromotion: hasActivePromotion.value,
+      originalPrice: hasActivePromotion.value ? props.product.price : null,
+      discountPercent: hasActivePromotion.value ? props.product.promotion.discount : null
     })
 
     // Nettoyage (non bloquant)
     cleanOldTransactions().catch(() => {})
 
-    // SUCCÈS : afficher le message personnalisé (pas alert)
+    // SUCCÈS
     showSuccess.value = true
     setTimeout(() => {
       showSuccess.value = false
@@ -283,5 +380,60 @@ const handleConsume = async () => {
 </script>
 
 <style scoped>
-/* Styles inchangés */
+/* ✨ NOUVEAUX STYLES PROMO */
+
+.card.on-promotion {
+  border: 2px solid #f59e0b;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.05) 0%, var(--dark-200) 100%);
+}
+
+.promo-badge {
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  color: white;
+  padding: 0.4rem 0.8rem;
+  border-radius: 12px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+  z-index: 25;
+  animation: pulse-promo 2s ease-in-out infinite;
+}
+
+@keyframes pulse-promo {
+  0%, 100% {
+    transform: translateX(-50%) scale(1);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+  }
+  50% {
+    transform: translateX(-50%) scale(1.05);
+    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.6);
+  }
+}
+
+.promo-info {
+  background: rgba(245, 158, 11, 0.1);
+  border-left: 3px solid #f59e0b;
+  padding: 0.5rem;
+  border-radius: 6px;
+}
+
+.promo-detail {
+  font-size: 0.75rem;
+  color: #fbbf24;
+  margin: 0.2rem 0;
+}
+
+.promo-btn {
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%) !important;
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.promo-btn:hover:not(:disabled) {
+  box-shadow: 0 6px 20px rgba(245, 158, 11, 0.5);
+  transform: scale(1.02);
+}
 </style>
