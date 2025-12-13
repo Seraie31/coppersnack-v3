@@ -203,8 +203,17 @@ const filteredProducts = computed(() => {
     )
   }
 
-  // Tri
+  // Tri avec RUPTURE DE STOCK EN DERNIER
   return filtered.sort((a, b) => {
+    // 🚨 PRIORITÉ 1 : Produits en stock AVANT produits en rupture
+    const aOutOfStock = a.stockFrigo === 0 ? 1 : 0
+    const bOutOfStock = b.stockFrigo === 0 ? 1 : 0
+    
+    if (aOutOfStock !== bOutOfStock) {
+      return aOutOfStock - bOutOfStock  // Rupture (1) après disponible (0)
+    }
+
+    // 🚨 PRIORITÉ 2 : Appliquer le tri choisi (parmi le même groupe stock/rupture)
     const aIsFav = userFavorites.value.includes(a.id)
     const bIsFav = userFavorites.value.includes(b.id)
 
