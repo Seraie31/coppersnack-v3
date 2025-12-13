@@ -1,7 +1,7 @@
 <template>
   <div>
     <Navbar />
-    
+
     <div class="container mx-auto px-2 sm:px-4 py-4 sm:py-8">
       <!-- Header avec compteur -->
       <div class="flex items-center justify-between mb-4 sm:mb-6">
@@ -35,7 +35,7 @@
 
       <!-- Filtres avec icônes et compteurs -->
       <div class="flex flex-wrap gap-2 mb-6">
-        <button 
+        <button
           @click="filterCategory = 'all'"
           :class="filterCategory === 'all' ? 'btn-primary' : 'btn-secondary'"
           class="flex-1 min-w-[80px] text-sm sm:text-base px-3 py-2 flex items-center justify-center gap-2"
@@ -43,7 +43,7 @@
           <span>Tous</span>
           <span class="text-xs opacity-75">({{ getCategoryCount('all') }})</span>
         </button>
-        <button 
+        <button
           @click="filterCategory = 'favorites'"
           :class="filterCategory === 'favorites' ? 'btn-primary' : 'btn-secondary'"
           class="flex-1 min-w-[80px] text-sm sm:text-base px-3 py-2 flex items-center justify-center gap-2"
@@ -51,7 +51,15 @@
           <span>⭐</span>
           <span class="text-xs opacity-75">({{ userFavorites.length }})</span>
         </button>
-        <button 
+        <button
+          @click="filterCategory = 'promotions'"
+          :class="filterCategory === 'promotions' ? 'btn-primary' : 'btn-secondary'"
+          class="flex-1 min-w-[80px] text-sm sm:text-base px-3 py-2 flex items-center justify-center gap-2"
+        >
+          <span>🏷️</span>
+          <span class="text-xs opacity-75">({{ getCategoryCount('promotions') }})</span>
+        </button>
+        <button
           @click="filterCategory = 'boissons'"
           :class="filterCategory === 'boissons' ? 'btn-primary' : 'btn-secondary'"
           class="flex-1 min-w-[80px] text-sm sm:text-base px-3 py-2 flex items-center justify-center gap-2"
@@ -59,7 +67,7 @@
           <span>🥤</span>
           <span class="text-xs opacity-75">({{ getCategoryCount('boissons') }})</span>
         </button>
-        <button 
+        <button
           @click="filterCategory = 'snacks'"
           :class="filterCategory === 'snacks' ? 'btn-primary' : 'btn-secondary'"
           class="flex-1 min-w-[80px] text-sm sm:text-base px-3 py-2 flex items-center justify-center gap-2"
@@ -107,8 +115,8 @@
         tag="div"
         class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-6"
       >
-        <ProductCard 
-          v-for="product in filteredProducts" 
+        <ProductCard
+          v-for="product in filteredProducts"
           :key="product.id"
           :product="product"
           :favorites="userFavorites"
@@ -168,27 +176,38 @@ const filteredProducts = computed(() => {
 
   // Filtrage par catégorie
   if (filterCategory.value === 'all') {
-    filtered = productsStore.products.filter(p => 
-      p && 
-      p.id && 
-      p.name && 
+    filtered = productsStore.products.filter(p =>
+      p &&
+      p.id &&
+      p.name &&
       typeof p.price === 'number' &&
       typeof p.stockFrigo === 'number'
     )
   } else if (filterCategory.value === 'favorites') {
-    filtered = productsStore.products.filter(p => 
-      p && 
-      p.id && 
-      p.name && 
+    filtered = productsStore.products.filter(p =>
+      p &&
+      p.id &&
+      p.name &&
       typeof p.price === 'number' &&
       typeof p.stockFrigo === 'number' &&
       userFavorites.value.includes(p.id)
     )
+  } else if (filterCategory.value === 'promotions') {
+    // ✨ NOUVEAU : Filtre pour les promos
+    filtered = productsStore.products.filter(p =>
+      p &&
+      p.id &&
+      p.name &&
+      typeof p.price === 'number' &&
+      typeof p.stockFrigo === 'number' &&
+      p.promotion?.active &&
+      isPromotionValid(p.promotion)
+    )
   } else {
-    filtered = productsStore.products.filter(p => 
-      p && 
-      p.id && 
-      p.name && 
+    filtered = productsStore.products.filter(p =>
+      p &&
+      p.id &&
+      p.name &&
       typeof p.price === 'number' &&
       typeof p.stockFrigo === 'number' &&
       p.category === filterCategory.value
@@ -198,61 +217,91 @@ const filteredProducts = computed(() => {
   // Filtrage par recherche
   if (searchQuery.value.trim()) {
     const query = searchQuery.value.toLowerCase().trim()
-    filtered = filtered.filter(p => 
+    filtered = filtered.filter(p =>
       p.name.toLowerCase().includes(query)
     )
   }
 
-  // Tri avec RUPTURE DE STOCK EN DERNIER
+  // ✨ NOUVEAU TRI AVEC PROMOTIONS EN PRIORITÉ
   return filtered.sort((a, b) => {
-    // 🚨 PRIORITÉ 1 : Produits en stock AVANT produits en rupture
+    // 🏷️ PRIORITÉ 1 : Promotions EN PREMIER
+    const aHasPromo = a.promotion?.active && isPromotionValid(a.promotion)
+    const bHasPromo = b.promotion?.active && isPromotionValid(b.promotion)
+
+    if (aHasPromo !== bHasPromo) {
+      return bHasPromo ? 1 : -1  // Promo en premier
+    }
+
+    // 🚨 PRIORITÉ 2 : Produits en stock AVANT produits en rupture
     const aOutOfStock = a.stockFrigo === 0 ? 1 : 0
     const bOutOfStock = b.stockFrigo === 0 ? 1 : 0
-    
+
     if (aOutOfStock !== bOutOfStock) {
       return aOutOfStock - bOutOfStock  // Rupture (1) après disponible (0)
     }
 
-    // 🚨 PRIORITÉ 2 : Appliquer le tri choisi (parmi le même groupe stock/rupture)
+    // ⭐ PRIORITÉ 3 : Favoris ensuite
     const aIsFav = userFavorites.value.includes(a.id)
     const bIsFav = userFavorites.value.includes(b.id)
 
+    if (aIsFav !== bIsFav) {
+      return bIsFav ? 1 : -1  // Favoris en premier
+    }
+
+    // 📊 PRIORITÉ 4 : Appliquer le tri choisi
     switch (sortBy.value) {
       case 'favorites':
-        if (aIsFav !== bIsFav) return bIsFav ? 1 : -1
         return a.name.localeCompare(b.name)
-      
+
       case 'price-asc':
         return a.price - b.price
-      
+
       case 'price-desc':
         return b.price - a.price
-      
+
       case 'stock-asc':
         return a.stockFrigo - b.stockFrigo
-      
+
       case 'stock-desc':
         return b.stockFrigo - a.stockFrigo
-      
+
       case 'name':
         return a.name.localeCompare(b.name)
-      
+
       default:
-        return 0
+        return a.name.localeCompare(b.name)
     }
   })
 })
 
+// ✨ NOUVELLE FONCTION : Vérifier si une promo est valide
+const isPromotionValid = (promo) => {
+  if (!promo || !promo.active) return false
+
+  // Vérifier date de fin
+  if (promo.endDate) {
+    const now = new Date()
+    const endDate = promo.endDate.toDate ? promo.endDate.toDate() : new Date(promo.endDate)
+    if (now > endDate) return false
+  }
+
+  return true
+}
+
 const getCategoryCount = (category) => {
   if (!productsStore.products) return 0
-  
+
   if (category === 'all') {
-    return productsStore.products.filter(p => 
+    return productsStore.products.filter(p =>
       p && p.id && p.name && typeof p.price === 'number'
     ).length
+  } else if (category === 'promotions') {
+    return productsStore.products.filter(p =>
+      p && p.id && p.name && typeof p.price === 'number' && p.promotion?.active && isPromotionValid(p.promotion)
+    ).length
   }
-  
-  return productsStore.products.filter(p => 
+
+  return productsStore.products.filter(p =>
     p && p.id && p.name && p.category === category
   ).length
 }
@@ -260,6 +309,7 @@ const getCategoryCount = (category) => {
 const getEmptyStateEmoji = () => {
   if (searchQuery.value) return '🔍'
   if (filterCategory.value === 'favorites') return '⭐'
+  if (filterCategory.value === 'promotions') return '🏷️'
   if (filterCategory.value === 'boissons') return '🥤'
   if (filterCategory.value === 'snacks') return '🍫'
   return '📦'
@@ -271,6 +321,9 @@ const getEmptyStateMessage = () => {
   }
   if (filterCategory.value === 'favorites') {
     return 'Aucun produit favori'
+  }
+  if (filterCategory.value === 'promotions') {
+    return 'Aucune promotion disponible'
   }
   if (filterCategory.value === 'boissons') {
     return 'Aucune boisson disponible'

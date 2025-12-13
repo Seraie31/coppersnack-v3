@@ -1,94 +1,101 @@
 <template>
-  <div v-if="product" class="card relative" :class="{ 'opacity-50': isOutOfStock, 'on-promotion': hasActivePromotion }">
-    
+  <div
+    v-if="product"
+    class="card relative flex flex-col h-full p-3 rounded-xl bg-dark-200"
+    :class="{ 'opacity-50': isOutOfStock, 'on-promotion': hasActivePromotion }"
+  >
     <!-- BADGE PROMOTION -->
     <div v-if="hasActivePromotion" class="promo-badge">
       🏷️ -{{ product.promotion.discount }}%
     </div>
 
     <!-- FAVORIS -->
-    <button 
+    <button
       @click.stop="toggleFavorite"
-      class="absolute top-3 right-3 z-20 w-10 h-10 rounded-full bg-dark-300 hover:bg-dark-400 flex items-center justify-center transition-all"
+      class="absolute top-3 right-3 z-20 w-9 h-9 rounded-full bg-dark-300 hover:bg-dark-400 flex items-center justify-center transition-all"
       :class="isFavorite ? 'text-yellow-400' : 'text-gray-500'"
       :title="isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'"
     >
-      <svg class="w-6 h-6" :fill="isFavorite ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
+      <svg class="w-5 h-5" :fill="isFavorite ? 'currentColor' : 'none'" stroke="currentColor" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
           d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
       </svg>
     </button>
 
-    <!-- OVERLAY RUPTURE -->
-    <div
-      v-if="isOutOfStock"
-      class="absolute inset-0 flex items-center justify-center bg-black bg-opacity-60 rounded-xl z-10"
-    >
-      <span class="text-2xl font-bold text-red-500">Rupture de stock</span>
-    </div>
-
-    <!-- IMAGE -->
-    <div class="aspect-square bg-dark-200 rounded-lg mb-4 flex items-center justify-center overflow-hidden">
-      <img 
-        v-if="product.image" 
-        :src="product.image" 
-        :alt="product.name"
-        class="w-full h-full object-cover"
-        @error="handleImageError"
-      />
-      <span v-else class="text-6xl">📦</span>
-    </div>
-
-    <!-- TITRE -->
-    <h3 class="font-bold text-lg mb-2 truncate" :title="product.name">
-      {{ product.name }}
-    </h3>
-    
-    <!-- PRIX + STOCK -->
-    <div class="flex items-center justify-between mb-4">
-      <div class="flex items-baseline gap-2">
-        <span 
-          v-if="hasActivePromotion" 
-          class="text-lg font-bold text-gray-500 line-through"
-        >
-          {{ formatCurrency(product.price) }}
-        </span>
-        <span 
-          class="text-2xl font-bold"
-          :class="hasActivePromotion ? 'text-orange-400' : 'text-primary'"
-        >
-          {{ formatCurrency(finalPrice) }}
-        </span>
+    <!-- CONTENU PRINCIPAL : tout en colonne, bouton collé en bas -->
+    <div class="flex flex-col flex-1">
+      <!-- IMAGE -->
+      <div class="aspect-square bg-dark-300 rounded-lg mb-3 flex items-center justify-center overflow-hidden">
+        <img
+          v-if="product.image"
+          :src="product.image"
+          :alt="product.name"
+          class="w-full h-full object-contain"
+          @error="handleImageError"
+        />
+        <span v-else class="text-4xl">📦</span>
       </div>
-      <span 
-        class="text-sm font-bold px-2 py-1 rounded"
-        :class="getStockClass(product.stockFrigo || 0)"
+
+      <!-- TITRE (multi-lignes sur mobile) -->
+      <h3
+        class="font-bold text-base mb-1 line-clamp-2 leading-snug"
+        :title="product.name"
       >
-        Stock: {{ product.stockFrigo || 0 }}
-      </span>
+        {{ product.name }}
+      </h3>
+
+      <!-- PRIX + STOCK -->
+      <div class="flex items-end justify-between gap-2 mb-2">
+        <div class="flex flex-col">
+          <span
+            v-if="hasActivePromotion"
+            class="text-sm font-semibold text-gray-500 line-through leading-tight"
+          >
+            {{ formatCurrency(product.price) }}
+          </span>
+          <span
+            class="text-xl font-extrabold leading-tight"
+            :class="hasActivePromotion ? 'text-orange-400' : 'text-primary'"
+          >
+            {{ formatCurrency(finalPrice) }}
+          </span>
+        </div>
+        <span
+          class="text-xs font-bold px-2 py-1 rounded whitespace-nowrap"
+          :class="getStockClass(product.stockFrigo || 0)"
+        >
+          Stock: {{ product.stockFrigo || 0 }}
+        </span>
+      </div>
+
+      <!-- INFO PROMO -->
+      <div
+        v-if="hasActivePromotion && (promotionInfo.endDate || promotionInfo.maxStock)"
+        class="promo-info mb-3 text-xs space-y-1"
+      >
+        <div v-if="promotionInfo.endDate" class="promo-detail">
+          ⏰ Jusqu'au {{ formatDate(promotionInfo.endDate) }}
+        </div>
+        <div v-if="promotionInfo.maxStock" class="promo-detail">
+          🎯 Limité à {{ promotionInfo.maxStock }} unités
+        </div>
+      </div>
+
+      <!-- pousse le bouton en bas de la card -->
+      <div class="mt-auto">
+        <!-- BOUTON CONSOMMER -->
+        <button
+          @click="showConfirm = true"
+          :disabled="isOutOfStock || loading"
+          class="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all text-sm py-2.5"
+          :class="{ 'promo-btn': hasActivePromotion }"
+        >
+          {{ loading ? 'Traitement...' : 'Consommer ' + formatCurrency(finalPrice) }}
+        </button>
+      </div>
     </div>
 
-    <!-- INFO PROMO -->
-    <div v-if="hasActivePromotion && (promotionInfo.endDate || promotionInfo.maxStock)" class="promo-info mb-3">
-      <div v-if="promotionInfo.endDate" class="promo-detail">
-        ⏰ Jusqu'au {{ formatDate(promotionInfo.endDate) }}
-      </div>
-      <div v-if="promotionInfo.maxStock" class="promo-detail">
-        🎯 Limité à {{ promotionInfo.maxStock }} unités
-      </div>
-    </div>
-
-    <!-- BOUTON CONSOMMER -->
-    <button 
-      @click="showConfirm = true" 
-      :disabled="isOutOfStock || loading"
-      class="w-full btn-primary disabled:opacity-50 disabled:cursor-not-allowed transition-all"
-      :class="{ 'promo-btn': hasActivePromotion }"
-    >
-      {{ loading ? 'Traitement...' : 'Consommer ' + formatCurrency(finalPrice) }}
-    </button>
-
-    <!-- CONFIRMATION -->
+    <!-- CONFIRMATION / MODALES SUCCÈS / ERREUR : inchangés -->
     <ConfirmModal
       :show="showConfirm"
       :title="`Confirmer la consommation`"
@@ -97,7 +104,6 @@
       @confirm="handleConfirm"
     />
 
-    <!-- MESSAGE DE SUCCÈS -->
     <div v-if="showSuccess" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
       <div class="bg-dark-100 rounded-xl p-6 max-w-sm mx-4 text-center">
         <div class="text-5xl mb-4">✅</div>
@@ -109,7 +115,6 @@
       </div>
     </div>
 
-    <!-- MESSAGE D'ERREUR -->
     <div v-if="showError" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
       <div class="bg-dark-100 rounded-xl p-6 max-w-sm mx-4 text-center">
         <div class="text-5xl mb-4">❌</div>
@@ -380,7 +385,7 @@ const handleConsume = async () => {
 </script>
 
 <style scoped>
-/* ✨ NOUVEAUX STYLES PROMO */
+/* ✨ STYLES PROMO */
 
 .card.on-promotion {
   border: 2px solid #f59e0b;
@@ -389,42 +394,45 @@ const handleConsume = async () => {
 
 .promo-badge {
   position: absolute;
-  top: -10px;
-  left: 50%;
-  transform: translateX(-50%);
+  top: 0.25rem;
+  left: 0.5rem;
   background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
   color: white;
-  padding: 0.4rem 0.8rem;
-  border-radius: 12px;
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
   font-weight: 700;
-  font-size: 0.85rem;
-  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+  font-size: 0.7rem;
+  max-width: 70%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
   z-index: 25;
   animation: pulse-promo 2s ease-in-out infinite;
 }
 
 @keyframes pulse-promo {
   0%, 100% {
-    transform: translateX(-50%) scale(1);
-    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+    transform: scale(1);
+    box-shadow: 0 2px 8px rgba(245, 158, 11, 0.4);
   }
   50% {
-    transform: translateX(-50%) scale(1.05);
-    box-shadow: 0 6px 20px rgba(245, 158, 11, 0.6);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.6);
   }
 }
 
 .promo-info {
-  background: rgba(245, 158, 11, 0.1);
+  background: rgba(245, 158, 11, 0.08);
   border-left: 3px solid #f59e0b;
-  padding: 0.5rem;
+  padding: 0.4rem 0.5rem;
   border-radius: 6px;
 }
 
 .promo-detail {
-  font-size: 0.75rem;
+  font-size: 0.7rem;
   color: #fbbf24;
-  margin: 0.2rem 0;
+  line-height: 1.3;
 }
 
 .promo-btn {
@@ -435,5 +443,13 @@ const handleConsume = async () => {
 .promo-btn:hover:not(:disabled) {
   box-shadow: 0 6px 20px rgba(245, 158, 11, 0.5);
   transform: scale(1.02);
+}
+
+/* Utilitaire pour limiter le texte à 2 lignes */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 </style>
