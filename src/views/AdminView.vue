@@ -1227,12 +1227,20 @@ const savePromotion = async ({ productId, promotion }) => {
       promotion: promotion
     })
     
-    showSuccessMessage('✅ Promotion créée !')
+    // 🆕 Détecter le type d'action
+    if (promotion.active === false) {
+      showSuccessMessage('✅ Promotion supprimée avec succès')
+    } else if (editPromotionMode.value) {
+      showSuccessMessage('✅ Promotion modifiée avec succès')
+    } else {
+      showSuccessMessage('✅ Promotion créée avec succès')
+    }
+    
     showPromotionModal.value = false
     await productsStore.fetchProducts()
   } catch (error) {
     console.error('Erreur promotion:', error)
-    showErrorMessage('Erreur lors de la création')
+    showErrorMessage('Erreur lors de la sauvegarde')
   }
 }
 

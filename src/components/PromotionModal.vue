@@ -126,6 +126,20 @@
         <div v-if="error" class="error-message">
           ❌ {{ error }}
         </div>
+
+        <!-- 🆕 ZONE DE SUPPRESSION -->
+        <div v-if="editMode && hasActivePromotion" class="danger-zone">
+          <button 
+            @click="handleDeletePromotion" 
+            :disabled="loading"
+            class="btn-delete-promo"
+          >
+            ❌ Supprimer la promotion
+          </button>
+          <p class="danger-hint">
+            Cette action annulera définitivement la promotion en cours
+          </p>
+        </div>
       </div>
 
       <!-- Footer -->
@@ -211,6 +225,11 @@ const isValid = computed(() => {
   return true
 })
 
+// 🆕 Vérifier si promo active
+const hasActivePromotion = computed(() => {
+  return props.product?.promotion?.active === true
+})
+
 // Formater le prix
 const formatPrice = (price) => {
   return new Intl.NumberFormat('fr-FR', {
@@ -282,6 +301,30 @@ const savePromotion = () => {
   })
 
   loading.value = false
+}
+
+// 🆕 Supprimer la promotion
+const handleDeletePromotion = () => {
+  if (!confirm('⚠️ Confirmer la suppression de la promotion en cours ?')) {
+    return
+  }
+
+  loading.value = true
+  error.value = ''
+
+  emit('save', {
+    productId: props.product.id,
+    promotion: {
+      active: false,
+      discount: 0,
+      endDate: null,
+      maxStock: null,
+      reason: ''
+    }
+  })
+
+  loading.value = false
+  close()
 }
 
 // Fermer la modale
@@ -546,7 +589,7 @@ const close = () => {
 
 .promotion-summary li {
   padding: 0.5rem 0;
-  border-bottom: 1px solid var(--dark-300);
+  border-bottom: 1px solid #374151;
 }
 
 .promotion-summary li:last-child {
@@ -564,6 +607,46 @@ const close = () => {
   border-left: 4px solid #ef4444;
   border-radius: 8px;
   color: #fca5a5;
+}
+
+/* 🆕 Zone de danger */
+.danger-zone {
+  background: rgba(239, 68, 68, 0.1);
+  border: 2px solid rgba(239, 68, 68, 0.3);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-top: 0.5rem;
+}
+
+.btn-delete-promo {
+  width: 100%;
+  padding: 0.8rem;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.btn-delete-promo:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+}
+
+.btn-delete-promo:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.danger-hint {
+  margin: 0.6rem 0 0 0;
+  font-size: 0.85rem;
+  color: #fca5a5;
+  text-align: center;
+  font-style: italic;
 }
 
 /* Footer */
