@@ -13,71 +13,19 @@
         <h1 class="text-2xl sm:text-3xl font-bold">Mon Profil</h1>
       </div>
 
-      <!-- Card Profil Principal -->
-      <div class="card mb-6">
-        <div class="flex flex-col sm:flex-row items-center gap-6">
-          <!-- Avatar avec initiales -->
-          <div class="relative">
-            <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-br from-primary to-orange-600 flex items-center justify-center text-3xl sm:text-4xl font-bold text-white shadow-lg">
-              {{ getInitials(userProfile?.displayName || authStore.user?.displayName || authStore.user?.email) }}
-            </div>
-            <div class="absolute bottom-1 right-1 w-5 h-5 bg-green-500 rounded-full border-4 border-dark-100"></div>
-          </div>
+      <!-- ✨ NOUVELLE CARTE MEMBRE VIRTUELLE ✨ -->
+      <MemberCard
+        :user-name="userProfile?.displayName || authStore.user?.displayName || 'Utilisateur'"
+        :user-email="authStore.user?.email"
+        :user-id="authStore.user?.uid"
+        :balance="balance"
+        :total-transactions="stats.totalConsumptions"
+        :total-spent="stats.totalSpent"
+        :streak="stats.streak"
+        :created-at="userProfile?.createdAt"
+      />
 
-          <!-- Infos utilisateur -->
-          <div class="flex-1 text-center sm:text-left">
-            <h2 class="text-xl sm:text-2xl font-bold mb-2">
-              {{ userProfile?.displayName || authStore.user?.displayName || 'Utilisateur' }}
-            </h2>
-            <p class="text-gray-400 text-sm mb-3">{{ authStore.user?.email }}</p>
-            
-            <!-- Badges -->
-            <div class="flex flex-wrap gap-2 justify-center sm:justify-start">
-              <span v-if="userProfile?.role === 'admin'" class="badge bg-red-500/20 text-red-400">
-                👑 Admin
-              </span>
-              <span v-else class="badge bg-gray-700/60 text-gray-300">
-                👤 Utilisateur
-              </span>
-              <span v-if="favoriteCount > 0" class="badge bg-yellow-500/20 text-yellow-400">
-                ⭐ {{ favoriteCount }} favoris
-              </span>
-            </div>
-          </div>
 
-          <!-- Solde -->
-          <div class="text-center bg-dark-200 rounded-xl p-4 sm:p-6 min-w-[140px]">
-            <p class="text-gray-400 text-xs sm:text-sm mb-1">Solde</p>
-            <p class="text-2xl sm:text-3xl font-bold" :class="balanceColor">
-              {{ formatCurrency(balance) }}
-            </p>
-          </div>
-        </div>
-      </div>
-
-      <!-- Statistiques -->
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-        <div class="card text-center p-4">
-          <div class="text-2xl sm:text-3xl mb-2">🛒</div>
-          <p class="text-xl sm:text-2xl font-bold text-primary">{{ stats.totalConsumptions }}</p>
-          <p class="text-xs sm:text-sm text-gray-400">Consommations</p>
-        </div>
-        <div class="card text-center p-4">
-          <div class="text-2xl sm:text-3xl mb-2">💰</div>
-          <p class="text-xl sm:text-2xl font-bold text-green-400">{{ formatCurrency(stats.totalSpent) }}</p>
-          <p class="text-xs sm:text-sm text-gray-400">Dépensé</p>
-        </div>
-        <div class="card text-center p-4">
-          <div class="text-2xl sm:text-3xl mb-2">📈</div>
-          <p class="text-xl sm:text-2xl font-bold text-blue-400">{{ formatCurrency(stats.averageSpent) }}</p>
-          <p class="text-xs sm:text-sm text-gray-400">Moyenne</p>
-        </div>
-        <div class="card text-center p-4">
-          <div class="text-2xl sm:text-3xl mb-2">🔥</div>
-          <p class="text-xl sm:text-2xl font-bold text-orange-400">{{ stats.streak }}</p>
-          <p class="text-xs sm:text-sm text-gray-400">Jours actifs</p>
-        </div>
-      </div>
 
       <!-- Rechargement -->
       <div class="card mb-6">
@@ -226,6 +174,7 @@ import { useRouter } from 'vue-router'
 import { collection, query, where, orderBy, limit, getDocs, onSnapshot, addDoc, doc, updateDoc, increment, deleteDoc, Timestamp } from 'firebase/firestore'
 import { db } from '@/firebase/config'
 import Navbar from '@/components/Navbar.vue'
+import MemberCard from '@/components/MemberCard.vue' // ✨ NOUVEAU IMPORT
 
 const authStore = useAuthStore()
 const router = useRouter()
@@ -239,7 +188,7 @@ const showError = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
 
-const quickAmounts = [5, 10, 20, 50]
+const quickAmounts = [1, 5, 10, 20]
 
 let unsubscribeTransactions = null
 let unsubscribeUserProfile = null
