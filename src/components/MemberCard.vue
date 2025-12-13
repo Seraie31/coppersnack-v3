@@ -8,7 +8,7 @@
       <!-- Header -->
       <div class="card-header">
         <div class="brand">
-          <span class="brand-icon">🍎</span>
+          <span class="brand-icon">🔶</span>
           <span class="brand-name">COPPERSNACK</span>
         </div>
         <div class="level-badge">
@@ -45,7 +45,7 @@
       <div class="card-stats">
         <div class="stat-item">
           <div class="stat-icon">💰</div>
-          <div class="stat-content">
+          <div class="stat-content" :class="balanceColor">
             <div class="stat-value">
               <AnimatedNumber :value="balance" :duration="1000" />
               <span class="stat-currency">€</span>
@@ -108,7 +108,7 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import AnimatedNumber from './AnimatedNumber.vue'
+import AnimatedNumber from '@/components/AnimatedNumber.vue'
 
 const props = defineProps({
   userName: {
@@ -147,15 +147,17 @@ const props = defineProps({
 
 // Calcul du niveau basé sur les dépenses totales
 const LEVEL_THRESHOLDS = {
-  bronze: { min: 0, max: 50, name: 'Bronze', icon: '🥉', next: 'Argent' },
-  silver: { min: 50, max: 150, name: 'Argent', icon: '🥈', next: 'Or' },
-  gold: { min: 150, max: Infinity, name: 'Or', icon: '🥇', next: 'Platine' }
+  bronze: { min: 0, max: 25, name: 'Bronze', icon: '🥉', next: 'Argent' },
+  silver: { min: 25, max: 75, name: 'Argent', icon: '🥈', next: 'Or' },
+  gold: { min: 75, max: 150, name: 'Or', icon: '🥇', next: 'Copper' },
+  copper: { min: 150, max: Infinity, name: 'Copper', icon: '🔶', next: 'Légende' }
 }
 
 const userLevel = computed(() => {
   const total = props.totalSpent
-  if (total >= 150) return 'gold'
-  if (total >= 50) return 'silver'
+  if (total >= 150) return 'copper'
+  if (total >= 75) return 'gold'
+  if (total >= 25) return 'silver'
   return 'bronze'
 })
 
@@ -166,9 +168,10 @@ const nextLevelName = computed(() => levelData.value.next)
 
 // Calcul de la progression vers le niveau suivant
 const nextLevelThreshold = computed(() => {
-  if (userLevel.value === 'bronze') return 50
-  if (userLevel.value === 'silver') return 150
-  return 300 // Platine (fictif)
+  if (userLevel.value === 'bronze') return 25
+  if (userLevel.value === 'silver') return 75
+  if (userLevel.value === 'gold') return 150
+  return 300 // Copper (fictif pour affichage)
 })
 
 const progressPercentage = computed(() => {
@@ -176,11 +179,13 @@ const progressPercentage = computed(() => {
   const current = userLevel.value
   
   if (current === 'bronze') {
-    return Math.min(Math.round((total / 50) * 100), 100)
+    return Math.min(Math.round((total / 25) * 100), 100)
   } else if (current === 'silver') {
-    return Math.min(Math.round(((total - 50) / 100) * 100), 100)
+    return Math.min(Math.round(((total - 25) / 50) * 100), 100)
+  } else if (current === 'gold') {
+    return Math.min(Math.round(((total - 75) / 75) * 100), 100)
   } else {
-    return 100 // Gold = max
+    return 100 // Copper = max
   }
 })
 
@@ -217,6 +222,15 @@ const formatCurrency = (amount) => {
     minimumFractionDigits: 0
   }).format(amount || 0)
 }
+
+// Couleur du solde selon le montant
+const balanceColor = computed(() => {
+  const bal = props.balance
+  if (bal >= 10) return 'text-green-400'    // 🟢 Vert : ≥ 10€
+  if (bal >= 5) return 'text-yellow-400'    // 🟡 Jaune : 5€ - 9,99€
+  if (bal > 0) return 'text-orange-400'     // 🟠 Orange : 0,01€ - 4,99€
+  return 'text-red-400'                     // 🔴 Rouge + PULSE : ≤ 0€
+})
 </script>
 
 <style scoped>
@@ -248,6 +262,10 @@ const formatCurrency = (amount) => {
 
 .member-card.level-gold {
   background: linear-gradient(135deg, #ffd700 0%, #ff8c00 100%);
+}
+
+.member-card.level-copper {
+  background: linear-gradient(135deg, #ff6b35 0%, #b7410e 100%);
 }
 
 /* Effet holographique en arrière-plan */
@@ -388,6 +406,11 @@ const formatCurrency = (amount) => {
   border-top-color: rgba(255, 215, 0, 1);
 }
 
+.level-ring.ring-copper {
+  border-top-color: rgba(255, 107, 53, 1);
+  box-shadow: 0 0 15px rgba(255, 107, 53, 0.6);
+}
+
 @keyframes rotate-ring {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
@@ -476,12 +499,33 @@ const formatCurrency = (amount) => {
   display: flex;
   align-items: baseline;
   gap: 0.2rem;
+  transition: color 0.3s ease;
+}
+
+/* Animation pour solde faible */
+.stat-content.text-red-400 .stat-value {
+  animation: pulse-warning 1.5s ease-in-out infinite;
+  text-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
+}
+
+@keyframes pulse-warning {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    text-shadow: 0 0 10px rgba(248, 113, 113, 0.5);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.05);
+    text-shadow: 0 0 20px rgba(248, 113, 113, 0.8);
+  }
 }
 
 .stat-currency {
   font-size: 1rem;
   font-weight: 600;
   opacity: 0.9;
+  color: inherit; /* Hérite la couleur du parent */
 }
 
 .stat-label {
@@ -553,6 +597,11 @@ const formatCurrency = (amount) => {
 
 .progress-bar-fill.fill-gold {
   background: linear-gradient(90deg, #ffd700, #ffed4e);
+}
+
+.progress-bar-fill.fill-copper {
+  background: linear-gradient(90deg, #ff6b35, #ff9068);
+  box-shadow: 0 0 15px rgba(255, 107, 53, 0.8);
 }
 
 /* Effet shimmer sur la barre */

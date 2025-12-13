@@ -15,15 +15,22 @@
 
       <!-- ✨ NOUVELLE CARTE MEMBRE VIRTUELLE ✨ -->
       <MemberCard
+        v-if="authStore.user?.uid"
         :user-name="userProfile?.displayName || authStore.user?.displayName || 'Utilisateur'"
         :user-email="authStore.user?.email"
-        :user-id="authStore.user?.uid"
+        :user-id="authStore.user.uid"
         :balance="balance"
         :total-transactions="stats.totalConsumptions"
         :total-spent="stats.totalSpent"
         :streak="stats.streak"
         :created-at="userProfile?.createdAt"
       />
+      
+      <!-- Loader en attendant -->
+      <div v-else class="card text-center py-8">
+        <div class="text-4xl mb-4">⏳</div>
+        <p class="text-gray-400">Chargement du profil...</p>
+      </div>
 
 
 
@@ -32,7 +39,7 @@
         <h2 class="text-xl sm:text-2xl font-bold mb-4">💳 Recharger mon compte</h2>
         
         <!-- Montants rapides -->
-        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
+        <div class="grid grid-cols-3 sm:grid-cols-5 gap-3 mb-4">
           <button
             v-for="amount in quickAmounts"
             :key="amount"
@@ -164,6 +171,31 @@
         <button @click="showError = false" class="btn-primary">OK</button>
       </div>
     </div>
+
+    <!-- Modale de confirmation d'annulation -->
+    <div v-if="showCancelConfirm" class="fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50">
+      <div class="bg-dark-100 rounded-xl p-6 max-w-sm mx-4">
+        <h3 class="text-xl font-bold mb-4">Confirmer l'annulation</h3>
+        <p class="text-gray-300 mb-6">
+          Annuler la consommation de <span class="font-bold text-primary">{{ transactionToCancel?.productName }}</span> pour 
+          <span class="font-bold text-green-400">{{ transactionToCancel?.amount.toFixed(2) }} €</span> ?
+        </p>
+        <div class="flex gap-3">
+          <button 
+            @click="showCancelConfirm = false; transactionToCancel = null" 
+            class="flex-1 px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg transition-colors"
+          >
+            Annuler
+          </button>
+          <button 
+            @click="confirmCancelTransaction" 
+            class="flex-1 px-4 py-2 bg-primary hover:bg-primary-dark rounded-lg transition-colors font-bold"
+          >
+            Confirmer
+          </button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -187,8 +219,10 @@ const showSuccess = ref(false)
 const showError = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
+const showCancelConfirm = ref(false)
+const transactionToCancel = ref(null)
 
-const quickAmounts = [1, 5, 10, 20]
+const quickAmounts = [1, 2, 5, 10, 20]
 
 let unsubscribeTransactions = null
 let unsubscribeUserProfile = null
@@ -274,15 +308,22 @@ const showErrorMessage = (message) => {
   showError.value = true
 }
 
-const handleCancelTransaction = async (transaction) => {
+const handleCancelTransaction = (transaction) => {
   if (!isToday(transaction.date)) {
     showErrorMessage('Vous ne pouvez annuler que les consommations du jour')
     return
   }
 
-  if (!confirm(`Annuler la consommation de "${transaction.productName}" ?`)) {
-    return
-  }
+  // Afficher la modale de confirmation
+  transactionToCancel.value = transaction
+  showCancelConfirm.value = true
+}
+
+const confirmCancelTransaction = async () => {
+  const transaction = transactionToCancel.value
+  if (!transaction) return
+
+  showCancelConfirm.value = false
 
   try {
     const userRef = doc(db, 'users', transaction.userId)
@@ -311,6 +352,7 @@ const handleCancelTransaction = async (transaction) => {
     }
 
     showSuccessMessage('Consommation annulée !')
+    transactionToCancel.value = null
   } catch (error) {
     console.error('Erreur annulation transaction:', error)
     showErrorMessage('Erreur lors de l\'annulation')
